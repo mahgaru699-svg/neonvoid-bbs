@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v2</title>
+<title>NEONVOID.BBS v3</title>
 
 <style>
 body{
@@ -32,6 +32,7 @@ textarea{
 button{
   margin:5px 0;
 }
+
 .admin{
   border:2px solid red;
   padding:10px;
@@ -42,7 +43,7 @@ button{
 
 <body>
 
-<h2>NEONVOID.BBS v2</h2>
+<h2>NEONVOID.BBS v3</h2>
 
 <div>
   <a onclick="board('b')">/b/</a> |
@@ -84,26 +85,37 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let currentBoard = "b";
+let currentThreadId = null;
 let lastPostTime = 0;
 
-/* ====== ДОСКИ ====== */
-window.board = function(name){
-  currentBoard = name;
-  render();
-};
+/* ===== АНОНИМНЫЙ ID ===== */
+function getAnonId(){
+  let id = localStorage.getItem("anonId");
+  if(!id){
+    id = "Anon#" + Math.floor(Math.random()*9000+1000);
+    localStorage.setItem("anonId", id);
+  }
+  return id;
+}
 
-/* ====== СПАМ ЗАЩИТА ====== */
+/* ===== СПАМ ЗАЩИТА ===== */
 function spamCheck(){
   let now = Date.now();
-  if(now - lastPostTime < 3000){
-    alert("Слишком быстро. Подожди 3 секунды.");
+  if(now - lastPostTime < 2500){
+    alert("Слишком быстро. Подожди.");
     return false;
   }
   lastPostTime = now;
   return true;
 }
 
-/* ====== НОВЫЙ ТРЕД ====== */
+/* ===== ДОСКИ ===== */
+window.board = function(name){
+  currentBoard = name;
+  render();
+};
+
+/* ===== НОВЫЙ ТРЕД ===== */
 window.newThread = async function(){
 
   if(!spamCheck()) return;
@@ -118,18 +130,16 @@ window.newThread = async function(){
     title,
     content: text,
     board: currentBoard,
-    createdAt: Date.now(),
-    bumpedAt: Date.now(),
-    closed: false
+    createdAt: Date.now()
   });
 
   render();
 };
 
-/* ====== ОТКРЫТЬ ТРЕД ====== */
+/* ===== ОТКРЫТЬ ТРЕД ===== */
 window.openThread = async function(id, title, content){
 
-  window.currentThreadId = id;
+  currentThreadId = id;
 
   document.getElementById("forum").innerHTML = `
     <h3>${title}</h3>
@@ -146,7 +156,7 @@ window.openThread = async function(id, title, content){
   loadReplies(id);
 };
 
-/* ====== ОТВЕТ ====== */
+/* ===== ОТПРАВКА ОТВЕТА ===== */
 window.sendReply = async function(){
 
   if(!spamCheck()) return;
@@ -155,15 +165,22 @@ window.sendReply = async function(){
   if(!txt) return;
 
   await addDoc(collection(db, "posts"), {
-    threadId: window.currentThreadId,
+    threadId: currentThreadId,
     content: txt,
+    author: getAnonId(),
+    postId: Date.now(),
     createdAt: Date.now()
   });
 
-  loadReplies(window.currentThreadId);
+  loadReplies(currentThreadId);
 };
 
-/* ====== ЗАГРУЗКА ОТВЕТОВ ====== */
+/* ===== ЦИТАТЫ >>123 ===== */
+function parseQuotes(text){
+  return text.replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
+}
+
+/* ===== ЗАГРУЗКА ОТВЕТОВ ===== */
 window.loadReplies = async function(threadId){
 
   const snap = await getDocs(collection(db, "posts"));
@@ -174,14 +191,19 @@ window.loadReplies = async function(threadId){
     let p = d.data();
 
     if(p.threadId === threadId){
-      html += `<div class="post">>> ${p.content}</div>`;
+      html += `
+        <div class="post">
+          <b>${p.author}</b> #${p.postId}<br>
+          ${parseQuotes(p.content)}
+        </div>
+      `;
     }
   });
 
   document.getElementById("replies").innerHTML = html;
 };
 
-/* ====== АДМИНКА ====== */
+/* ===== АДМИНКА ===== */
 window.adminPanel = function(){
 
   let pass = prompt("Admin password:");
@@ -199,7 +221,7 @@ window.adminPanel = function(){
   `;
 };
 
-/* ====== ЗАГРУЗКА ВСЕХ ТРЕДОВ ====== */
+/* ===== ВСЕ ТРЕДЫ ===== */
 window.loadAll = async function(){
 
   const snap = await getDocs(collection(db, "threads"));
@@ -221,13 +243,13 @@ window.loadAll = async function(){
   document.getElementById("adminArea").innerHTML = html;
 };
 
-/* ====== УДАЛЕНИЕ ====== */
+/* ===== УДАЛЕНИЕ ===== */
 window.deleteThread = async function(id){
   await deleteDoc(doc(db, "threads", id));
   loadAll();
 };
 
-/* ====== РЕНДЕР ====== */
+/* ===== РЕНДЕР ===== */
 async function render(){
 
   let html = `<h3>/${currentBoard}/</h3>`;
