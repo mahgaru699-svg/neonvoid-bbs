@@ -21,6 +21,7 @@ body{
 a{
   color:blue;
   cursor:pointer;
+  text-decoration: underline;
 }
 
 textarea{
@@ -42,9 +43,9 @@ button{
 <a onclick="board('tech')">/tech/</a> |
 <a onclick="board('random')">/random/</a>
 
-<div>
-  <button onclick="newThread()">Новый тред</button>
-</div>
+<hr>
+
+<button onclick="newThread()">Новый тред</button>
 
 <div id="forum"></div>
 
@@ -74,13 +75,13 @@ const db = getFirestore(app);
 
 let current = "b";
 
-// смена доски
+/* смена доски */
 window.board = function(name){
   current = name;
   render();
 };
 
-// создать тред
+/* новый тред */
 window.newThread = async function(){
   let title = prompt("Название треда:");
   if(!title) return;
@@ -98,11 +99,67 @@ window.newThread = async function(){
   render();
 };
 
-// загрузка тредов
+/* открыть тред */
+window.openThread = async function(id, title, content){
+
+  let html = `
+    <h3>${title}</h3>
+    <div class="post">${content}</div>
+
+    <hr>
+
+    <textarea id="replyText"></textarea>
+    <button onclick="sendReply('${id}')">Ответить</button>
+
+    <hr>
+
+    <div id="replies"></div>
+  `;
+
+  document.getElementById("forum").innerHTML = html;
+
+  loadReplies(id);
+};
+
+/* отправка ответа */
+window.sendReply = async function(threadId){
+
+  let txt = document.getElementById("replyText").value;
+  if(!txt) return;
+
+  await addDoc(collection(db, "posts"), {
+    threadId: threadId,
+    content: txt,
+    createdAt: Date.now()
+  });
+
+  loadReplies(threadId);
+};
+
+/* загрузка ответов */
+window.loadReplies = async function(threadId){
+
+  const snap = await getDocs(collection(db, "posts"));
+
+  let html = "";
+
+  snap.forEach(doc=>{
+    let p = doc.data();
+
+    if(p.threadId === threadId){
+      html += `<div class="post">>> ${p.content}</div>`;
+    }
+  });
+
+  document.getElementById("replies").innerHTML = html;
+};
+
+/* загрузка тредов */
 async function render(){
+
   let html = "<h3>/"+current+"/</h3>";
 
-  const q = query(collection(db, "threads"), orderBy("createdAt", "desc"));
+  const q = query(collection(db, "threads"), orderBy("createdAt","desc"));
   const snap = await getDocs(q);
 
   snap.forEach(doc=>{
@@ -111,7 +168,9 @@ async function render(){
     if(t.board === current){
       html += `
         <div class="post">
-          <b>${t.title}</b><br>
+          <a onclick="openThread('${doc.id}','${t.title}','${t.content}')">
+            <b>${t.title}</b>
+          </a><br>
           ${t.content}
         </div>
       `;
