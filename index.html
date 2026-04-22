@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v5</title>
+<title>NEONVOID.BBS v6</title>
 
 <style>
 body{
@@ -62,12 +62,14 @@ img{
 
 <body>
 
-<h2>NEONVOID.BBS v5</h2>
+<h2>NEONVOID.BBS v6</h2>
 
 <div>
-  <a onclick="board('b')">/b/</a> |
-  <a onclick="board('tech')">/tech/</a> |
-  <a onclick="board('random')">/random/</a>
+  <a onclick="board('deepweb')">Deep Web</a> |
+  <a onclick="board('memes')">Memes</a> |
+  <a onclick="board('tech')">Tech / Hacking</a> |
+  <a onclick="board('life')">Random Life</a> |
+  <a onclick="board('art')">Digital Art</a>
 </div>
 
 <hr>
@@ -112,7 +114,7 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let currentBoard = "b";
+let currentBoard = "deepweb";
 let currentThreadId = null;
 let lastPostTime = 0;
 
@@ -126,7 +128,7 @@ function getAnonId(){
   return id;
 }
 
-/* ===== SPAM PROTECTION ===== */
+/* ===== SPAM ===== */
 function spamCheck(){
   let now = Date.now();
   if(now - lastPostTime < 2000){
@@ -137,7 +139,7 @@ function spamCheck(){
   return true;
 }
 
-/* ===== BOARD SWITCH ===== */
+/* ===== BOARDS ===== */
 window.board = function(name){
   currentBoard = name;
   render();
@@ -148,7 +150,7 @@ window.newThread = async function(){
 
   if(!spamCheck()) return;
 
-  let title = prompt("Название:");
+  let title = prompt("Название треда:");
   if(!title) return;
 
   let text = prompt("Текст:");
@@ -186,7 +188,7 @@ window.openThread = async function(id, title, content){
   loadReplies(id);
 };
 
-/* ===== SEND REPLY (TEXT + IMAGE + BUMP) ===== */
+/* ===== SEND REPLY ===== */
 window.sendReply = async function(){
 
   if(!spamCheck()) return;
@@ -218,12 +220,12 @@ window.sendReply = async function(){
   loadReplies(currentThreadId);
 };
 
-/* ===== QUOTES >>123 ===== */
+/* ===== QUOTES ===== */
 function parseQuotes(text){
   return (text || "").replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
 }
 
-/* ===== LOAD REPLIES ===== */
+/* ===== REPLIES ===== */
 window.loadReplies = async function(threadId){
 
   const snap = await getDocs(collection(db, "posts"));
@@ -247,30 +249,23 @@ window.loadReplies = async function(threadId){
   document.getElementById("replies").innerHTML = html;
 };
 
-/* ===== ADMIN ===== */
-window.adminPanel = function(){
+/* ===== ADMIN (FIXED) ===== */
+window.adminPanel = async function(){
 
   let pass = prompt("Admin password:");
   if(pass !== "admin123"){
-    alert("Wrong");
+    alert("Wrong password");
     return;
   }
 
-  document.getElementById("forum").innerHTML = `
+  let snap = await getDocs(collection(db, "threads"));
+
+  let html = `
     <div class="admin">
       <h3>ADMIN PANEL</h3>
-      <button onclick="loadAll()">Все треды</button>
+      <p>Все треды:</p>
     </div>
-    <div id="adminArea"></div>
   `;
-};
-
-/* ===== LOAD ALL THREADS ===== */
-window.loadAll = async function(){
-
-  const snap = await getDocs(collection(db, "threads"));
-
-  let html = "";
 
   snap.forEach(d=>{
     let t = d.data();
@@ -284,19 +279,27 @@ window.loadAll = async function(){
     `;
   });
 
-  document.getElementById("adminArea").innerHTML = html;
+  document.getElementById("forum").innerHTML = html;
 };
 
 /* ===== DELETE THREAD ===== */
 window.deleteThread = async function(id){
   await deleteDoc(doc(db, "threads", id));
-  loadAll();
+  adminPanel();
 };
 
-/* ===== RENDER (BUMP SORT) ===== */
+/* ===== RENDER ===== */
 async function render(){
 
-  let html = `<h3>/${currentBoard}/</h3>`;
+  let names = {
+    deepweb: "Deep Web Discussions",
+    memes: "Memes & Chaos",
+    tech: "Tech / Hacking",
+    life: "Random Life Talk",
+    art: "Digital Art / Creations"
+  };
+
+  let html = `<h3>${names[currentBoard]}</h3>`;
 
   const q = query(collection(db, "threads"), orderBy("bumpedAt","desc"));
   const snap = await getDocs(q);
@@ -318,9 +321,6 @@ async function render(){
 
   document.getElementById("forum").innerHTML = html;
 }
-
-/* ===== AUTO REFRESH ===== */
-setInterval(render, 5000);
 
 render();
 </script>
