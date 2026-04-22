@@ -1,14 +1,20 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
 <meta charset="UTF-8">
 <title>NEONVOID.BBS</title>
 
 <style>
 body{
-  font-family: Arial;
+  font-family: Arial, sans-serif;
   background:#eee;
   margin:20px;
+}
+
+a{
+  color:blue;
+  cursor:pointer;
+  text-decoration: underline;
 }
 
 .post{
@@ -18,15 +24,10 @@ body{
   margin:8px 0;
 }
 
-a{
-  color:blue;
-  cursor:pointer;
-  text-decoration: underline;
-}
-
 textarea{
   width:100%;
   height:100px;
+  margin-top:10px;
 }
 
 button{
@@ -39,9 +40,11 @@ button{
 
 <h2>NEONVOID.BBS</h2>
 
-<a onclick="board('b')">/b/</a> |
-<a onclick="board('tech')">/tech/</a> |
-<a onclick="board('random')">/random/</a>
+<div>
+  <a onclick="board('b')">/b/</a> |
+  <a onclick="board('tech')">/tech/</a> |
+  <a onclick="board('random')">/random/</a>
+</div>
 
 <hr>
 
@@ -73,11 +76,11 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-let current = "b";
+let currentBoard = "b";
 
 /* смена доски */
 window.board = function(name){
-  current = name;
+  currentBoard = name;
   render();
 };
 
@@ -92,7 +95,7 @@ window.newThread = async function(){
   await addDoc(collection(db, "threads"), {
     title: title,
     content: text,
-    board: current,
+    board: currentBoard,
     createdAt: Date.now()
   });
 
@@ -102,7 +105,7 @@ window.newThread = async function(){
 /* открыть тред */
 window.openThread = async function(id, title, content){
 
-  let html = `
+  document.getElementById("forum").innerHTML = `
     <h3>${title}</h3>
     <div class="post">${content}</div>
 
@@ -111,12 +114,8 @@ window.openThread = async function(id, title, content){
     <textarea id="replyText"></textarea>
     <button onclick="sendReply('${id}')">Ответить</button>
 
-    <hr>
-
     <div id="replies"></div>
   `;
-
-  document.getElementById("forum").innerHTML = html;
 
   loadReplies(id);
 };
@@ -154,10 +153,10 @@ window.loadReplies = async function(threadId){
   document.getElementById("replies").innerHTML = html;
 };
 
-/* загрузка тредов */
+/* список тредов */
 async function render(){
 
-  let html = "<h3>/"+current+"/</h3>";
+  let html = `<h3>/${currentBoard}/</h3>`;
 
   const q = query(collection(db, "threads"), orderBy("createdAt","desc"));
   const snap = await getDocs(q);
@@ -165,7 +164,7 @@ async function render(){
   snap.forEach(doc=>{
     let t = doc.data();
 
-    if(t.board === current){
+    if(t.board === currentBoard){
       html += `
         <div class="post">
           <a onclick="openThread('${doc.id}','${t.title}','${t.content}')">
