@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v8</title>
+<title>NEONVOID.BBS v9</title>
 
 <style>
 body{
@@ -12,17 +12,13 @@ body{
   color:#e6f2e6;
 }
 
-h2{
-  display:none;
-}
-
 .header{
   text-align:center;
   margin-bottom:10px;
 }
 
 .header img{
-  max-width:360px;
+  max-width:380px;
   border:2px solid #556b2f;
   box-shadow:0 0 15px #000;
 }
@@ -68,7 +64,7 @@ button:hover{
 }
 
 img{
-  max-width:250px;
+  max-width:260px;
   display:block;
   margin-top:5px;
   border:1px solid #556b2f;
@@ -83,15 +79,13 @@ img{
   font-weight:bold;
 }
 
-.crown{
-  color:gold;
-}
 .footer{
   text-align:center;
-  margin-top:20px;
-  opacity:0.7;
-  font-size:12px;
+  margin-top:80px;
+  font-size:11px;
+  opacity:0.4;
 }
+
 .rules{
   background:#1f2a1f;
   padding:10px;
@@ -103,11 +97,14 @@ img{
 <body>
 
 <div class="header">
-  <!-- ЛОГО -->
-  <img src="https://ibb.co/xtYZ6sjK" alt="NEONVOID LOGO">
+
+  <!-- 🖼️ ТВОЙ ЛОГО (починено) -->
+  <img src="https://i.ibb.co/xtYZ6sjK/Chat-GPT-Image-22-2026-04-20-35.png"
+       alt="NEONVOID LOGO">
+
   <div class="nav">
-    <a onclick="view='forum';render()">Forum</a>
-    <a onclick="view='rules';renderRules()">Rules</a>
+    <a onclick="go('forum')">Forum</a>
+    <a onclick="go('rules')">Rules</a>
     <a onclick="board('frontline')">Frontline</a>
     <a onclick="board('intel')">Intel</a>
     <a onclick="board('field')">Field</a>
@@ -164,24 +161,9 @@ let currentThread = null;
 let last = 0;
 let view = "forum";
 
-/* ===== ANON + OWNER ===== */
+/* ===== FIXED ADM ===== */
 function getAnon(){
-  let id = localStorage.getItem("anon");
-  if(!id){
-    id = "Unit#" + Math.floor(Math.random()*9000+1000);
-    localStorage.setItem("anon", id);
-  }
-
-  // 👑 OWNER SET (первый пользователь = ты)
-  if(!localStorage.getItem("owner")){
-    localStorage.setItem("owner", id);
-  }
-
-  return id;
-}
-
-function isOwner(id){
-  return localStorage.getItem("owner") === id;
+  return "adm15 👑";
 }
 
 /* ===== SPAM ===== */
@@ -192,20 +174,25 @@ function spam(){
   return true;
 }
 
+/* ===== ROUTER FIX ===== */
+window.go = function(v){
+  view=v;
+  render();
+};
+
 /* ===== BOARDS ===== */
-window.board = function(b){
+window.board=function(b){
   currentBoard=b;
   view="forum";
   render();
 };
 
-/* ===== THREAD ===== */
-window.newThread = async function(){
-
+/* ===== NEW THREAD ===== */
+window.newThread=async function(){
   if(!spam()) return;
 
-  let t = prompt("Title:");
-  let c = prompt("Text:");
+  let t=prompt("Title:");
+  let c=prompt("Text:");
   if(!t||!c) return;
 
   await addDoc(collection(db,"threads"),{
@@ -217,8 +204,8 @@ window.newThread = async function(){
   });
 };
 
-/* ===== OPEN ===== */
-window.openThread = function(id,t,c){
+/* ===== OPEN THREAD ===== */
+window.openThread=function(id,t,c){
 
   currentThread=id;
 
@@ -237,7 +224,7 @@ window.openThread = function(id,t,c){
 };
 
 /* ===== REPLY ===== */
-window.reply = async function(){
+window.reply=async function(){
 
   if(!spam()) return;
 
@@ -265,12 +252,26 @@ window.reply = async function(){
   });
 };
 
-/* ===== QUOTES ===== */
-function parse(t){
-  return (t||"").replace(/>>(\d+)/g,'<span class="quote">>>$1</span>');
+/* ===== RULES ===== */
+function rules(){
+  document.getElementById("app").innerHTML=`
+  <div class="rules">
+    <h3>NEONVOID RULES</h3>
+
+    <p>Не создавай проблем другим пользователям.</p>
+    <p>Разрешено всё, что не нарушает закон.</p>
+    <p>Анонимность обязательна.</p>
+    <p>Модерация окончательна.</p>
+
+    <p><b>Запрещено:</b><br>
+    - насилие<br>
+    - доксинг<br>
+    - спам</p>
+
+  </div>`;
 }
 
-/* ===== REALTIME POSTS ===== */
+/* ===== LISTENER ===== */
 function listen(id){
 
   const q=query(collection(db,"posts"));
@@ -283,17 +284,10 @@ function listen(id){
       let p=d.data();
 
       if(p.threadId===id){
-
-        let nameClass = isOwner(p.author) ? "gold" : "";
-        let crown = isOwner(p.author) ? "👑" : "";
-
         html+=`
         <div class="post">
-          <span class="${nameClass}">
-            ${crown} ${p.author}
-          </span> #${p.id}<br>
-
-          ${parse(p.content)}
+          <b>${p.author}</b> #${p.id}<br>
+          ${p.content||""}
           ${p.image?`<img src="${p.image}">`:""}
         </div>`;
       }
@@ -303,51 +297,10 @@ function listen(id){
   });
 }
 
-/* ===== ADMIN ===== */
-window.adminPanel = function(){
-
-  let pass=prompt("Admin:");
-  if(pass!=="admin123") return;
-
-  alert("OK ADMIN MODE");
-};
-
-/* ===== RULES ===== */
-function renderRules(){
-
-  document.getElementById("app").innerHTML=`
-  <div class="rules">
-
-  <h3>Rules of NEONVOID</h3>
-
-  <p><b>Основное правило:</b><br>
-  Не создавай проблем другим пользователям.</p>
-
-  <p><b>Свобода контента:</b><br>
-  Разрешено всё, что не нарушает законы РФ.</p>
-
-  <p><b>Анонимность:</b><br>
-  Не пытайся раскрывать личности анонов.</p>
-
-  <p><b>Модерация:</b><br>
-  Решения модераторов окончательны.</p>
-
-  <p><b>Запрещено:</b><br>
-  - насилие<br>
-  - доксинг<br>
-  - спам<br>
-  - незаконный контент</p>
-
-  <p><b>Простыми словами:</b><br>
-  веди себя нормально, не ломай атмосферу.</p>
-
-  </div>`;
-}
-
-/* ===== RENDER ===== */
+/* ===== RENDER SAFE ===== */
 function render(){
 
-  if(view==="rules") return renderRules();
+  if(view==="rules") return rules();
 
   const q=query(collection(db,"threads"),orderBy("bumpedAt","desc"));
 
