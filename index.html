@@ -2,19 +2,13 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS</title>
+<title>NEONVOID.BBS v2</title>
 
 <style>
 body{
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   background:#eee;
   margin:20px;
-}
-
-a{
-  color:blue;
-  cursor:pointer;
-  text-decoration: underline;
 }
 
 .post{
@@ -24,21 +18,31 @@ a{
   margin:8px 0;
 }
 
+a{
+  color:blue;
+  cursor:pointer;
+  text-decoration: underline;
+}
+
 textarea{
   width:100%;
   height:100px;
-  margin-top:10px;
 }
 
 button{
   margin:5px 0;
+}
+.admin{
+  border:2px solid red;
+  padding:10px;
+  background:#fff;
 }
 </style>
 </head>
 
 <body>
 
-<h2>NEONVOID.BBS</h2>
+<h2>NEONVOID.BBS v2</h2>
 
 <div>
   <a onclick="board('b')">/b/</a> |
@@ -49,6 +53,7 @@ button{
 <hr>
 
 <button onclick="newThread()">Новый тред</button>
+<button onclick="adminPanel()">Админка</button>
 
 <div id="forum"></div>
 
@@ -61,7 +66,9 @@ import {
   addDoc,
   getDocs,
   query,
-  orderBy
+  orderBy,
+  deleteDoc,
+  doc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -77,33 +84,52 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 let currentBoard = "b";
+let lastPostTime = 0;
 
-/* смена доски */
+/* ====== ДОСКИ ====== */
 window.board = function(name){
   currentBoard = name;
   render();
 };
 
-/* новый тред */
+/* ====== СПАМ ЗАЩИТА ====== */
+function spamCheck(){
+  let now = Date.now();
+  if(now - lastPostTime < 3000){
+    alert("Слишком быстро. Подожди 3 секунды.");
+    return false;
+  }
+  lastPostTime = now;
+  return true;
+}
+
+/* ====== НОВЫЙ ТРЕД ====== */
 window.newThread = async function(){
-  let title = prompt("Название треда:");
+
+  if(!spamCheck()) return;
+
+  let title = prompt("Название:");
   if(!title) return;
 
-  let text = prompt("Текст поста:");
+  let text = prompt("Текст:");
   if(!text) return;
 
   await addDoc(collection(db, "threads"), {
-    title: title,
+    title,
     content: text,
     board: currentBoard,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    bumpedAt: Date.now(),
+    closed: false
   });
 
   render();
 };
 
-/* открыть тред */
+/* ====== ОТКРЫТЬ ТРЕД ====== */
 window.openThread = async function(id, title, content){
+
+  window.currentThreadId = id;
 
   document.getElementById("forum").innerHTML = `
     <h3>${title}</h3>
@@ -112,7 +138,7 @@ window.openThread = async function(id, title, content){
     <hr>
 
     <textarea id="replyText"></textarea>
-    <button onclick="sendReply('${id}')">Ответить</button>
+    <button onclick="sendReply()">Ответить</button>
 
     <div id="replies"></div>
   `;
@@ -120,30 +146,32 @@ window.openThread = async function(id, title, content){
   loadReplies(id);
 };
 
-/* отправка ответа */
-window.sendReply = async function(threadId){
+/* ====== ОТВЕТ ====== */
+window.sendReply = async function(){
+
+  if(!spamCheck()) return;
 
   let txt = document.getElementById("replyText").value;
   if(!txt) return;
 
   await addDoc(collection(db, "posts"), {
-    threadId: threadId,
+    threadId: window.currentThreadId,
     content: txt,
     createdAt: Date.now()
   });
 
-  loadReplies(threadId);
+  loadReplies(window.currentThreadId);
 };
 
-/* загрузка ответов */
+/* ====== ЗАГРУЗКА ОТВЕТОВ ====== */
 window.loadReplies = async function(threadId){
 
   const snap = await getDocs(collection(db, "posts"));
 
   let html = "";
 
-  snap.forEach(doc=>{
-    let p = doc.data();
+  snap.forEach(d=>{
+    let p = d.data();
 
     if(p.threadId === threadId){
       html += `<div class="post">>> ${p.content}</div>`;
@@ -153,7 +181,53 @@ window.loadReplies = async function(threadId){
   document.getElementById("replies").innerHTML = html;
 };
 
-/* список тредов */
+/* ====== АДМИНКА ====== */
+window.adminPanel = function(){
+
+  let pass = prompt("Admin password:");
+  if(pass !== "admin123"){
+    alert("Wrong password");
+    return;
+  }
+
+  document.getElementById("forum").innerHTML = `
+    <div class="admin">
+      <h3>ADMIN PANEL</h3>
+      <button onclick="loadAll()">Все треды</button>
+    </div>
+    <div id="adminArea"></div>
+  `;
+};
+
+/* ====== ЗАГРУЗКА ВСЕХ ТРЕДОВ ====== */
+window.loadAll = async function(){
+
+  const snap = await getDocs(collection(db, "threads"));
+
+  let html = "";
+
+  snap.forEach(d=>{
+    let t = d.data();
+
+    html += `
+      <div class="post">
+        <b>${t.title}</b><br>
+        ${t.content}<br>
+        <button onclick="deleteThread('${d.id}')">DELETE</button>
+      </div>
+    `;
+  });
+
+  document.getElementById("adminArea").innerHTML = html;
+};
+
+/* ====== УДАЛЕНИЕ ====== */
+window.deleteThread = async function(id){
+  await deleteDoc(doc(db, "threads", id));
+  loadAll();
+};
+
+/* ====== РЕНДЕР ====== */
 async function render(){
 
   let html = `<h3>/${currentBoard}/</h3>`;
@@ -161,13 +235,13 @@ async function render(){
   const q = query(collection(db, "threads"), orderBy("createdAt","desc"));
   const snap = await getDocs(q);
 
-  snap.forEach(doc=>{
-    let t = doc.data();
+  snap.forEach(d=>{
+    let t = d.data();
 
     if(t.board === currentBoard){
       html += `
         <div class="post">
-          <a onclick="openThread('${doc.id}','${t.title}','${t.content}')">
+          <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
             <b>${t.title}</b>
           </a><br>
           ${t.content}
