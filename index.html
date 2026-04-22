@@ -2,80 +2,96 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v6</title>
+<title>NEONVOID.BBS v7</title>
 
 <style>
 body{
   font-family: Arial;
-  background:#d6daf0;
+  background:#2f3b2f;
   margin:20px;
-  color:#000;
+  color:#e6f2e6;
 }
 
+/* HEADER */
 h2{
-  color:#800000;
+  color:#9acd32;
 }
 
+/* LINKS */
 a{
-  color:#0000ee;
+  color:#b6ff8a;
   cursor:pointer;
   text-decoration: underline;
 }
 
+/* THREAD / POSTS */
 .post{
-  border:1px solid #aaa;
-  background:#f0e0d6;
+  border:1px solid #556b2f;
+  background:#3f4f3f;
   padding:8px;
   margin:8px 0;
 }
 
+/* TEXTAREA */
 textarea{
   width:100%;
   height:100px;
-  border:1px solid #aaa;
+  border:1px solid #556b2f;
+  background:#1f2a1f;
+  color:#e6f2e6;
 }
 
+/* BUTTONS */
 button{
   margin:5px 0;
-  background:#e0e0e0;
-  border:1px solid #999;
+  background:#556b2f;
+  border:1px solid #9acd32;
+  color:#fff;
   cursor:pointer;
 }
 
 button:hover{
-  background:#ccc;
+  background:#6b8e23;
 }
 
+/* ADMIN */
 .admin{
-  border:2px solid red;
+  border:2px solid #9acd32;
   padding:10px;
-  background:#fff;
+  background:#1f2a1f;
 }
 
+/* IMAGE */
 img{
   max-width:250px;
   display:block;
   margin-top:5px;
+  border:1px solid #556b2f;
+}
+
+/* QUOTES */
+.quote{
+  color:#9acd32;
 }
 </style>
 </head>
 
 <body>
 
-<h2>NEONVOID.BBS v6</h2>
+<h2>NEONVOID.BBS v7 // HAKI OPS</h2>
 
 <div>
-  <a onclick="board('deepweb')">Deep Web</a> |
-  <a onclick="board('memes')">Memes</a> |
-  <a onclick="board('tech')">Tech / Hacking</a> |
-  <a onclick="board('life')">Random Life</a> |
-  <a onclick="board('art')">Digital Art</a>
+  <a onclick="board('frontline')">Frontline Ops</a> |
+  <a onclick="board('intel')">Intel / Tech</a> |
+  <a onclick="board('field')">Field Reports</a> |
+  <a onclick="board('logs')">War Logs</a> |
+  <a onclick="board('art')">Green Art</a>
 </div>
 
 <hr>
 
-<button onclick="newThread()">Новый тред</button>
-<button onclick="adminPanel()">Админка</button>
+<button onclick="newThread()">New Thread</button>
+<button onclick="adminPanel()">Admin</button>
 
 <div id="forum"></div>
 
@@ -86,12 +102,12 @@ import {
   getFirestore,
   collection,
   addDoc,
-  getDocs,
-  query,
-  orderBy,
   updateDoc,
   doc,
-  deleteDoc
+  deleteDoc,
+  query,
+  orderBy,
+  onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 import {
@@ -114,28 +130,25 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let currentBoard = "deepweb";
+let currentBoard = "frontline";
 let currentThreadId = null;
-let lastPostTime = 0;
+let lastPost = 0;
 
-/* ===== ANON ID ===== */
-function getAnonId(){
-  let id = localStorage.getItem("anonId");
+/* ===== ANON ===== */
+function getAnon(){
+  let id = localStorage.getItem("anon");
   if(!id){
-    id = "Anon#" + Math.floor(Math.random()*9000+1000);
-    localStorage.setItem("anonId", id);
+    id = "Unit#" + Math.floor(Math.random()*9000+1000);
+    localStorage.setItem("anon", id);
   }
   return id;
 }
 
 /* ===== SPAM ===== */
-function spamCheck(){
+function spam(){
   let now = Date.now();
-  if(now - lastPostTime < 2000){
-    alert("Слишком быстро");
-    return false;
-  }
-  lastPostTime = now;
+  if(now - lastPost < 2000) return false;
+  lastPost = now;
   return true;
 }
 
@@ -145,31 +158,28 @@ window.board = function(name){
   render();
 };
 
-/* ===== NEW THREAD ===== */
+/* ===== THREAD ===== */
 window.newThread = async function(){
+  if(!spam()) return;
 
-  if(!spamCheck()) return;
+  let t = prompt("Mission title:");
+  if(!t) return;
 
-  let title = prompt("Название треда:");
-  if(!title) return;
+  let c = prompt("Report:");
+  if(!c) return;
 
-  let text = prompt("Текст:");
-  if(!text) return;
-
-  await addDoc(collection(db, "threads"), {
-    title,
-    content: text,
-    board: currentBoard,
-    createdAt: Date.now(),
-    bumpedAt: Date.now()
+  await addDoc(collection(db,"threads"),{
+    title:t,
+    content:c,
+    board:currentBoard,
+    createdAt:Date.now(),
+    bumpedAt:Date.now(),
+    sticky:false
   });
-
-  render();
 };
 
 /* ===== OPEN THREAD ===== */
-window.openThread = async function(id, title, content){
-
+window.openThread = function(id,title,content){
   currentThreadId = id;
 
   document.getElementById("forum").innerHTML = `
@@ -178,148 +188,116 @@ window.openThread = async function(id, title, content){
 
     <hr>
 
-    <textarea id="replyText"></textarea>
-    <input type="file" id="imgFile">
-    <button onclick="sendReply()">Ответить</button>
+    <textarea id="txt"></textarea>
+    <input type="file" id="img">
+    <button onclick="reply()">Send</button>
 
     <div id="replies"></div>
   `;
 
-  loadReplies(id);
+  listenReplies(id);
 };
 
-/* ===== SEND REPLY ===== */
-window.sendReply = async function(){
+/* ===== REPLY ===== */
+window.reply = async function(){
 
-  if(!spamCheck()) return;
+  if(!spam()) return;
 
-  let txt = document.getElementById("replyText").value;
-  let file = document.getElementById("imgFile").files[0];
+  let txt = document.getElementById("txt").value;
+  let file = document.getElementById("img").files[0];
 
-  let imageUrl = null;
+  let imgUrl = null;
 
   if(file){
-    let storageRef = ref(storage, "images/" + Date.now() + file.name);
-    await uploadBytes(storageRef, file);
-    imageUrl = await getDownloadURL(storageRef);
+    let r = ref(storage,"img/"+Date.now()+file.name);
+    await uploadBytes(r,file);
+    imgUrl = await getDownloadURL(r);
   }
 
-  await addDoc(collection(db, "posts"), {
-    threadId: currentThreadId,
-    content: txt,
-    author: getAnonId(),
-    postId: Date.now(),
-    image: imageUrl,
-    createdAt: Date.now()
+  await addDoc(collection(db,"posts"),{
+    threadId:currentThreadId,
+    content:txt,
+    author:getAnon(),
+    id:Date.now(),
+    image:imgUrl
   });
 
-  await updateDoc(doc(db, "threads", currentThreadId), {
-    bumpedAt: Date.now()
+  await updateDoc(doc(db,"threads",currentThreadId),{
+    bumpedAt:Date.now()
   });
-
-  loadReplies(currentThreadId);
 };
 
 /* ===== QUOTES ===== */
-function parseQuotes(text){
-  return (text || "").replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
+function parse(t){
+  return (t||"").replace(/>>(\d+)/g,'<span class="quote">>>$1</span>');
 }
 
-/* ===== REPLIES ===== */
-window.loadReplies = async function(threadId){
+/* ===== REALTIME POSTS ===== */
+function listenReplies(id){
 
-  const snap = await getDocs(collection(db, "posts"));
+  const q = query(collection(db,"posts"));
 
-  let html = "";
+  onSnapshot(q,(snap)=>{
+    let html="";
 
-  snap.forEach(d=>{
-    let p = d.data();
+    snap.forEach(d=>{
+      let p=d.data();
 
-    if(p.threadId === threadId){
-      html += `
+      if(p.threadId===id){
+        html+=`
         <div class="post">
-          <b>${p.author}</b> #${p.postId}<br>
-          ${parseQuotes(p.content)}
-          ${p.image ? `<img src="${p.image}">` : ""}
-        </div>
-      `;
-    }
+          <b>${p.author}</b> #${p.id}<br>
+          ${parse(p.content)}
+          ${p.image?`<img src="${p.image}">`:""}
+        </div>`;
+      }
+    });
+
+    document.getElementById("replies").innerHTML=html;
   });
+}
 
-  document.getElementById("replies").innerHTML = html;
-};
+/* ===== ADMIN ===== */
+window.adminPanel = function(){
 
-/* ===== ADMIN (FIXED) ===== */
-window.adminPanel = async function(){
+  let pass = prompt("Admin key:");
+  if(pass!=="admin123") return;
 
-  let pass = prompt("Admin password:");
-  if(pass !== "admin123"){
-    alert("Wrong password");
-    return;
-  }
-
-  let snap = await getDocs(collection(db, "threads"));
-
-  let html = `
+  document.getElementById("forum").innerHTML=`
     <div class="admin">
-      <h3>ADMIN PANEL</h3>
-      <p>Все треды:</p>
+      <h3>COMMAND CENTER</h3>
+      <button onclick="loadAll()">All Threads</button>
     </div>
+    <div id="adm"></div>
   `;
-
-  snap.forEach(d=>{
-    let t = d.data();
-
-    html += `
-      <div class="post">
-        <b>${t.title}</b><br>
-        ${t.content}<br>
-        <button onclick="deleteThread('${d.id}')">DELETE</button>
-      </div>
-    `;
-  });
-
-  document.getElementById("forum").innerHTML = html;
 };
 
-/* ===== DELETE THREAD ===== */
-window.deleteThread = async function(id){
-  await deleteDoc(doc(db, "threads", id));
-  adminPanel();
-};
+/* ===== RENDER (REALTIME THREADS) ===== */
+function render(){
 
-/* ===== RENDER ===== */
-async function render(){
+  const q = query(collection(db,"threads"),orderBy("bumpedAt","desc"));
 
-  let names = {
-    deepweb: "Deep Web Discussions",
-    memes: "Memes & Chaos",
-    tech: "Tech / Hacking",
-    life: "Random Life Talk",
-    art: "Digital Art / Creations"
-  };
+  onSnapshot(q,(snap)=>{
 
-  let html = `<h3>${names[currentBoard]}</h3>`;
+    let html=`<h3>${currentBoard.toUpperCase()}</h3>`;
 
-  const q = query(collection(db, "threads"), orderBy("bumpedAt","desc"));
-  const snap = await getDocs(q);
+    snap.forEach(d=>{
+      let t=d.data();
 
-  snap.forEach(d=>{
-    let t = d.data();
+      if(t.board===currentBoard){
 
-    if(t.board === currentBoard){
-      html += `
+        html+=`
         <div class="post">
           <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
             <b>${t.title}</b>
           </a><br>
           ${t.content}
-        </div>
-      `;
-    }
-  });
+        </div>`;
+      }
+    });
 
-  document.getElementById("forum").innerHTML = html;
+    document.getElementById("forum").innerHTML=html;
+  });
 }
 
 render();
