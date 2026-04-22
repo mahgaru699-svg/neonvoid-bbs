@@ -48,14 +48,16 @@ button{
 
 <div id="forum"></div>
 
-<!-- 🔥 FIREBASE -->
+<!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
   getFirestore,
   collection,
   addDoc,
-  getDocs
+  getDocs,
+  query,
+  orderBy
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -78,7 +80,7 @@ window.board = function(name){
   render();
 };
 
-// создать тред (🔥 теперь Firebase)
+// создать тред
 window.newThread = async function(){
   let title = prompt("Название треда:");
   if(!title) return;
@@ -90,8 +92,7 @@ window.newThread = async function(){
     title: title,
     content: text,
     board: current,
-    createdAt: Date.now(),
-    bumpedAt: Date.now()
+    createdAt: Date.now()
   });
 
   render();
@@ -101,7 +102,8 @@ window.newThread = async function(){
 async function render(){
   let html = "<h3>/"+current+"/</h3>";
 
-  const snap = await getDocs(collection(db, "threads"));
+  const q = query(collection(db, "threads"), orderBy("createdAt", "desc"));
+  const snap = await getDocs(q);
 
   snap.forEach(doc=>{
     let t = doc.data();
