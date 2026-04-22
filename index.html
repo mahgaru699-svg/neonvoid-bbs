@@ -2,35 +2,48 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v4</title>
+<title>NEONVOID.BBS v5</title>
 
 <style>
 body{
   font-family: Arial;
-  background:#eee;
+  background:#d6daf0;
   margin:20px;
+  color:#000;
 }
 
-.post{
-  border:1px solid #000;
-  background:#fff;
-  padding:8px;
-  margin:8px 0;
+h2{
+  color:#800000;
 }
 
 a{
-  color:blue;
+  color:#0000ee;
   cursor:pointer;
   text-decoration: underline;
+}
+
+.post{
+  border:1px solid #aaa;
+  background:#f0e0d6;
+  padding:8px;
+  margin:8px 0;
 }
 
 textarea{
   width:100%;
   height:100px;
+  border:1px solid #aaa;
 }
 
 button{
   margin:5px 0;
+  background:#e0e0e0;
+  border:1px solid #999;
+  cursor:pointer;
+}
+
+button:hover{
+  background:#ccc;
 }
 
 .admin{
@@ -38,12 +51,18 @@ button{
   padding:10px;
   background:#fff;
 }
+
+img{
+  max-width:250px;
+  display:block;
+  margin-top:5px;
+}
 </style>
 </head>
 
 <body>
 
-<h2>NEONVOID.BBS v4</h2>
+<h2>NEONVOID.BBS v5</h2>
 
 <div>
   <a onclick="board('b')">/b/</a> |
@@ -73,6 +92,13 @@ import {
   deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+import {
+  getStorage,
+  ref,
+  uploadBytes,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+
 const firebaseConfig = {
   apiKey: "AIzaSyAtTTArBPBNHmZZJSytqjaRwA3nXvANBV0",
   authDomain: "neonevvvoid.firebaseapp.com",
@@ -84,6 +110,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const storage = getStorage(app);
 
 let currentBoard = "b";
 let currentThreadId = null;
@@ -110,13 +137,13 @@ function spamCheck(){
   return true;
 }
 
-/* ===== BOARDS ===== */
+/* ===== BOARD SWITCH ===== */
 window.board = function(name){
   currentBoard = name;
   render();
 };
 
-/* ===== CREATE THREAD ===== */
+/* ===== NEW THREAD ===== */
 window.newThread = async function(){
 
   if(!spamCheck()) return;
@@ -150,6 +177,7 @@ window.openThread = async function(id, title, content){
     <hr>
 
     <textarea id="replyText"></textarea>
+    <input type="file" id="imgFile">
     <button onclick="sendReply()">Ответить</button>
 
     <div id="replies"></div>
@@ -158,23 +186,31 @@ window.openThread = async function(id, title, content){
   loadReplies(id);
 };
 
-/* ===== SEND REPLY + BUMP ===== */
+/* ===== SEND REPLY (TEXT + IMAGE + BUMP) ===== */
 window.sendReply = async function(){
 
   if(!spamCheck()) return;
 
   let txt = document.getElementById("replyText").value;
-  if(!txt) return;
+  let file = document.getElementById("imgFile").files[0];
+
+  let imageUrl = null;
+
+  if(file){
+    let storageRef = ref(storage, "images/" + Date.now() + file.name);
+    await uploadBytes(storageRef, file);
+    imageUrl = await getDownloadURL(storageRef);
+  }
 
   await addDoc(collection(db, "posts"), {
     threadId: currentThreadId,
     content: txt,
     author: getAnonId(),
     postId: Date.now(),
+    image: imageUrl,
     createdAt: Date.now()
   });
 
-  // 🔥 BUMP THREAD
   await updateDoc(doc(db, "threads", currentThreadId), {
     bumpedAt: Date.now()
   });
@@ -182,9 +218,9 @@ window.sendReply = async function(){
   loadReplies(currentThreadId);
 };
 
-/* ===== PARSE QUOTES ===== */
+/* ===== QUOTES >>123 ===== */
 function parseQuotes(text){
-  return text.replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
+  return (text || "").replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
 }
 
 /* ===== LOAD REPLIES ===== */
@@ -202,6 +238,7 @@ window.loadReplies = async function(threadId){
         <div class="post">
           <b>${p.author}</b> #${p.postId}<br>
           ${parseQuotes(p.content)}
+          ${p.image ? `<img src="${p.image}">` : ""}
         </div>
       `;
     }
@@ -221,7 +258,7 @@ window.adminPanel = function(){
 
   document.getElementById("forum").innerHTML = `
     <div class="admin">
-      <h3>ADMIN</h3>
+      <h3>ADMIN PANEL</h3>
       <button onclick="loadAll()">Все треды</button>
     </div>
     <div id="adminArea"></div>
@@ -256,7 +293,7 @@ window.deleteThread = async function(id){
   loadAll();
 };
 
-/* ===== RENDER (BUMP ORDER) ===== */
+/* ===== RENDER (BUMP SORT) ===== */
 async function render(){
 
   let html = `<h3>/${currentBoard}/</h3>`;
@@ -282,7 +319,7 @@ async function render(){
   document.getElementById("forum").innerHTML = html;
 }
 
-/* ===== AUTO REFRESH (LIGHT REALTIME) ===== */
+/* ===== AUTO REFRESH ===== */
 setInterval(render, 5000);
 
 render();
