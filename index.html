@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v7</title>
+<title>NEONVOID.BBS v8</title>
 
 <style>
 body{
@@ -12,19 +12,28 @@ body{
   color:#e6f2e6;
 }
 
-/* HEADER */
 h2{
-  color:#9acd32;
+  display:none;
 }
 
-/* LINKS */
-a{
+.header{
+  text-align:center;
+  margin-bottom:10px;
+}
+
+.header img{
+  max-width:360px;
+  border:2px solid #556b2f;
+  box-shadow:0 0 15px #000;
+}
+
+.nav a{
   color:#b6ff8a;
+  margin:0 8px;
   cursor:pointer;
   text-decoration: underline;
 }
 
-/* THREAD / POSTS */
 .post{
   border:1px solid #556b2f;
   background:#3f4f3f;
@@ -32,16 +41,14 @@ a{
   margin:8px 0;
 }
 
-/* TEXTAREA */
 textarea{
   width:100%;
   height:100px;
-  border:1px solid #556b2f;
   background:#1f2a1f;
   color:#e6f2e6;
+  border:1px solid #556b2f;
 }
 
-/* BUTTONS */
 button{
   margin:5px 0;
   background:#556b2f;
@@ -54,14 +61,12 @@ button:hover{
   background:#6b8e23;
 }
 
-/* ADMIN */
 .admin{
   border:2px solid #9acd32;
   padding:10px;
   background:#1f2a1f;
 }
 
-/* IMAGE */
 img{
   max-width:250px;
   display:block;
@@ -69,31 +74,55 @@ img{
   border:1px solid #556b2f;
 }
 
-/* QUOTES */
 .quote{
   color:#9acd32;
+}
+
+.gold{
+  color:gold;
+  font-weight:bold;
+}
+
+.crown{
+  color:gold;
+}
+.footer{
+  text-align:center;
+  margin-top:20px;
+  opacity:0.7;
+  font-size:12px;
+}
+.rules{
+  background:#1f2a1f;
+  padding:10px;
+  border:1px solid #556b2f;
 }
 </style>
 </head>
 
 <body>
 
-<h2>NEONVOID.BBS v7 // HAKI OPS</h2>
-
-<div>
-  <a onclick="board('frontline')">Frontline Ops</a> |
-  <a onclick="board('intel')">Intel / Tech</a> |
-  <a onclick="board('field')">Field Reports</a> |
-  <a onclick="board('logs')">War Logs</a> |
-  <a onclick="board('art')">Green Art</a>
+<div class="header">
+  <!-- ЛОГО -->
+  <img src="https://ibb.co/xtYZ6sjK" alt="NEONVOID LOGO">
+  <div class="nav">
+    <a onclick="view='forum';render()">Forum</a>
+    <a onclick="view='rules';renderRules()">Rules</a>
+    <a onclick="board('frontline')">Frontline</a>
+    <a onclick="board('intel')">Intel</a>
+    <a onclick="board('field')">Field</a>
+    <a onclick="board('art')">Art</a>
+  </div>
 </div>
-
-<hr>
 
 <button onclick="newThread()">New Thread</button>
 <button onclick="adminPanel()">Admin</button>
 
-<div id="forum"></div>
+<div id="app"></div>
+
+<div class="footer">
+  Created in 2026 — For you with soul
+</div>
 
 <!-- FIREBASE -->
 <script type="module">
@@ -131,62 +160,71 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 let currentBoard = "frontline";
-let currentThreadId = null;
-let lastPost = 0;
+let currentThread = null;
+let last = 0;
+let view = "forum";
 
-/* ===== ANON ===== */
+/* ===== ANON + OWNER ===== */
 function getAnon(){
   let id = localStorage.getItem("anon");
   if(!id){
     id = "Unit#" + Math.floor(Math.random()*9000+1000);
     localStorage.setItem("anon", id);
   }
+
+  // 👑 OWNER SET (первый пользователь = ты)
+  if(!localStorage.getItem("owner")){
+    localStorage.setItem("owner", id);
+  }
+
   return id;
+}
+
+function isOwner(id){
+  return localStorage.getItem("owner") === id;
 }
 
 /* ===== SPAM ===== */
 function spam(){
   let now = Date.now();
-  if(now - lastPost < 2000) return false;
-  lastPost = now;
+  if(now-last<2000) return false;
+  last=now;
   return true;
 }
 
 /* ===== BOARDS ===== */
-window.board = function(name){
-  currentBoard = name;
+window.board = function(b){
+  currentBoard=b;
+  view="forum";
   render();
 };
 
 /* ===== THREAD ===== */
 window.newThread = async function(){
+
   if(!spam()) return;
 
-  let t = prompt("Mission title:");
-  if(!t) return;
-
-  let c = prompt("Report:");
-  if(!c) return;
+  let t = prompt("Title:");
+  let c = prompt("Text:");
+  if(!t||!c) return;
 
   await addDoc(collection(db,"threads"),{
     title:t,
     content:c,
     board:currentBoard,
     createdAt:Date.now(),
-    bumpedAt:Date.now(),
-    sticky:false
+    bumpedAt:Date.now()
   });
 };
 
-/* ===== OPEN THREAD ===== */
-window.openThread = function(id,title,content){
-  currentThreadId = id;
+/* ===== OPEN ===== */
+window.openThread = function(id,t,c){
 
-  document.getElementById("forum").innerHTML = `
-    <h3>${title}</h3>
-    <div class="post">${content}</div>
+  currentThread=id;
 
-    <hr>
+  document.getElementById("app").innerHTML=`
+    <h3>${t}</h3>
+    <div class="post">${c}</div>
 
     <textarea id="txt"></textarea>
     <input type="file" id="img">
@@ -195,7 +233,7 @@ window.openThread = function(id,title,content){
     <div id="replies"></div>
   `;
 
-  listenReplies(id);
+  listen(id);
 };
 
 /* ===== REPLY ===== */
@@ -203,26 +241,26 @@ window.reply = async function(){
 
   if(!spam()) return;
 
-  let txt = document.getElementById("txt").value;
-  let file = document.getElementById("img").files[0];
+  let txt=document.getElementById("txt").value;
+  let file=document.getElementById("img").files[0];
 
-  let imgUrl = null;
+  let img=null;
 
   if(file){
-    let r = ref(storage,"img/"+Date.now()+file.name);
+    let r=ref(storage,"img/"+Date.now()+file.name);
     await uploadBytes(r,file);
-    imgUrl = await getDownloadURL(r);
+    img=await getDownloadURL(r);
   }
 
   await addDoc(collection(db,"posts"),{
-    threadId:currentThreadId,
+    threadId:currentThread,
     content:txt,
     author:getAnon(),
-    id:Date.now(),
-    image:imgUrl
+    image:img,
+    id:Date.now()
   });
 
-  await updateDoc(doc(db,"threads",currentThreadId),{
+  await updateDoc(doc(db,"threads",currentThread),{
     bumpedAt:Date.now()
   });
 };
@@ -233,20 +271,28 @@ function parse(t){
 }
 
 /* ===== REALTIME POSTS ===== */
-function listenReplies(id){
+function listen(id){
 
-  const q = query(collection(db,"posts"));
+  const q=query(collection(db,"posts"));
 
   onSnapshot(q,(snap)=>{
+
     let html="";
 
     snap.forEach(d=>{
       let p=d.data();
 
       if(p.threadId===id){
+
+        let nameClass = isOwner(p.author) ? "gold" : "";
+        let crown = isOwner(p.author) ? "👑" : "";
+
         html+=`
         <div class="post">
-          <b>${p.author}</b> #${p.id}<br>
+          <span class="${nameClass}">
+            ${crown} ${p.author}
+          </span> #${p.id}<br>
+
           ${parse(p.content)}
           ${p.image?`<img src="${p.image}">`:""}
         </div>`;
@@ -260,22 +306,50 @@ function listenReplies(id){
 /* ===== ADMIN ===== */
 window.adminPanel = function(){
 
-  let pass = prompt("Admin key:");
+  let pass=prompt("Admin:");
   if(pass!=="admin123") return;
 
-  document.getElementById("forum").innerHTML=`
-    <div class="admin">
-      <h3>COMMAND CENTER</h3>
-      <button onclick="loadAll()">All Threads</button>
-    </div>
-    <div id="adm"></div>
-  `;
+  alert("OK ADMIN MODE");
 };
 
-/* ===== RENDER (REALTIME THREADS) ===== */
+/* ===== RULES ===== */
+function renderRules(){
+
+  document.getElementById("app").innerHTML=`
+  <div class="rules">
+
+  <h3>Rules of NEONVOID</h3>
+
+  <p><b>Основное правило:</b><br>
+  Не создавай проблем другим пользователям.</p>
+
+  <p><b>Свобода контента:</b><br>
+  Разрешено всё, что не нарушает законы РФ.</p>
+
+  <p><b>Анонимность:</b><br>
+  Не пытайся раскрывать личности анонов.</p>
+
+  <p><b>Модерация:</b><br>
+  Решения модераторов окончательны.</p>
+
+  <p><b>Запрещено:</b><br>
+  - насилие<br>
+  - доксинг<br>
+  - спам<br>
+  - незаконный контент</p>
+
+  <p><b>Простыми словами:</b><br>
+  веди себя нормально, не ломай атмосферу.</p>
+
+  </div>`;
+}
+
+/* ===== RENDER ===== */
 function render(){
 
-  const q = query(collection(db,"threads"),orderBy("bumpedAt","desc"));
+  if(view==="rules") return renderRules();
+
+  const q=query(collection(db,"threads"),orderBy("bumpedAt","desc"));
 
   onSnapshot(q,(snap)=>{
 
@@ -285,7 +359,6 @@ function render(){
       let t=d.data();
 
       if(t.board===currentBoard){
-
         html+=`
         <div class="post">
           <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
@@ -296,7 +369,7 @@ function render(){
       }
     });
 
-    document.getElementById("forum").innerHTML=html;
+    document.getElementById("app").innerHTML=html;
   });
 }
 
