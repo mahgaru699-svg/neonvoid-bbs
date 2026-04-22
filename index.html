@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v3</title>
+<title>NEONVOID.BBS v4</title>
 
 <style>
 body{
@@ -43,7 +43,7 @@ button{
 
 <body>
 
-<h2>NEONVOID.BBS v3</h2>
+<h2>NEONVOID.BBS v4</h2>
 
 <div>
   <a onclick="board('b')">/b/</a> |
@@ -68,8 +68,9 @@ import {
   getDocs,
   query,
   orderBy,
-  deleteDoc,
-  doc
+  updateDoc,
+  doc,
+  deleteDoc
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -88,7 +89,7 @@ let currentBoard = "b";
 let currentThreadId = null;
 let lastPostTime = 0;
 
-/* ===== АНОНИМНЫЙ ID ===== */
+/* ===== ANON ID ===== */
 function getAnonId(){
   let id = localStorage.getItem("anonId");
   if(!id){
@@ -98,24 +99,24 @@ function getAnonId(){
   return id;
 }
 
-/* ===== СПАМ ЗАЩИТА ===== */
+/* ===== SPAM PROTECTION ===== */
 function spamCheck(){
   let now = Date.now();
-  if(now - lastPostTime < 2500){
-    alert("Слишком быстро. Подожди.");
+  if(now - lastPostTime < 2000){
+    alert("Слишком быстро");
     return false;
   }
   lastPostTime = now;
   return true;
 }
 
-/* ===== ДОСКИ ===== */
+/* ===== BOARDS ===== */
 window.board = function(name){
   currentBoard = name;
   render();
 };
 
-/* ===== НОВЫЙ ТРЕД ===== */
+/* ===== CREATE THREAD ===== */
 window.newThread = async function(){
 
   if(!spamCheck()) return;
@@ -130,13 +131,14 @@ window.newThread = async function(){
     title,
     content: text,
     board: currentBoard,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    bumpedAt: Date.now()
   });
 
   render();
 };
 
-/* ===== ОТКРЫТЬ ТРЕД ===== */
+/* ===== OPEN THREAD ===== */
 window.openThread = async function(id, title, content){
 
   currentThreadId = id;
@@ -156,7 +158,7 @@ window.openThread = async function(id, title, content){
   loadReplies(id);
 };
 
-/* ===== ОТПРАВКА ОТВЕТА ===== */
+/* ===== SEND REPLY + BUMP ===== */
 window.sendReply = async function(){
 
   if(!spamCheck()) return;
@@ -172,15 +174,20 @@ window.sendReply = async function(){
     createdAt: Date.now()
   });
 
+  // 🔥 BUMP THREAD
+  await updateDoc(doc(db, "threads", currentThreadId), {
+    bumpedAt: Date.now()
+  });
+
   loadReplies(currentThreadId);
 };
 
-/* ===== ЦИТАТЫ >>123 ===== */
+/* ===== PARSE QUOTES ===== */
 function parseQuotes(text){
   return text.replace(/>>(\d+)/g, '<span style="color:green">>>$1</span>');
 }
 
-/* ===== ЗАГРУЗКА ОТВЕТОВ ===== */
+/* ===== LOAD REPLIES ===== */
 window.loadReplies = async function(threadId){
 
   const snap = await getDocs(collection(db, "posts"));
@@ -203,25 +210,25 @@ window.loadReplies = async function(threadId){
   document.getElementById("replies").innerHTML = html;
 };
 
-/* ===== АДМИНКА ===== */
+/* ===== ADMIN ===== */
 window.adminPanel = function(){
 
   let pass = prompt("Admin password:");
   if(pass !== "admin123"){
-    alert("Wrong password");
+    alert("Wrong");
     return;
   }
 
   document.getElementById("forum").innerHTML = `
     <div class="admin">
-      <h3>ADMIN PANEL</h3>
+      <h3>ADMIN</h3>
       <button onclick="loadAll()">Все треды</button>
     </div>
     <div id="adminArea"></div>
   `;
 };
 
-/* ===== ВСЕ ТРЕДЫ ===== */
+/* ===== LOAD ALL THREADS ===== */
 window.loadAll = async function(){
 
   const snap = await getDocs(collection(db, "threads"));
@@ -243,18 +250,18 @@ window.loadAll = async function(){
   document.getElementById("adminArea").innerHTML = html;
 };
 
-/* ===== УДАЛЕНИЕ ===== */
+/* ===== DELETE THREAD ===== */
 window.deleteThread = async function(id){
   await deleteDoc(doc(db, "threads", id));
   loadAll();
 };
 
-/* ===== РЕНДЕР ===== */
+/* ===== RENDER (BUMP ORDER) ===== */
 async function render(){
 
   let html = `<h3>/${currentBoard}/</h3>`;
 
-  const q = query(collection(db, "threads"), orderBy("createdAt","desc"));
+  const q = query(collection(db, "threads"), orderBy("bumpedAt","desc"));
   const snap = await getDocs(q);
 
   snap.forEach(d=>{
@@ -274,6 +281,9 @@ async function render(){
 
   document.getElementById("forum").innerHTML = html;
 }
+
+/* ===== AUTO REFRESH (LIGHT REALTIME) ===== */
+setInterval(render, 5000);
 
 render();
 </script>
