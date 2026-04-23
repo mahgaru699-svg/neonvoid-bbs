@@ -2,318 +2,416 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID v17</title>
-
+<title>NEONVOID.BBS v9.1</title>
 <style>
-body{
-  font-family: Arial;
-  background:#eef2ff;
-  margin:20px;
-  color:#000;
-}
+    :root {
+        --bg: #2f3b2f;
+        --post-bg: #3f4f3f;
+        --border: #556b2f;
+        --text: #e6f2e6;
+        --accent: #9acd32;
+        --neon: #b6ff8a;
+    }
 
-.header{
-  text-align:center;
-}
+    body {
+        font-family: Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        margin: 20px;
+        line-height: 1.5;
+    }
 
-.header img{
-  max-width:420px;
-  width:100%;
-}
+    .header {
+        text-align: center;
+        margin-bottom: 15px;
+    }
 
-.nav a{
-  color:#00f;
-  margin-right:10px;
-  cursor:pointer;
-  text-decoration: underline;
-}
+    .header img {
+        max-width: 360px;
+        border: 2px solid var(--border);
+        box-shadow: 0 0 20px #000;
+    }
 
-.post{
-  border:1px solid #ccc;
-  background:#fff;
-  padding:8px;
-  margin:6px 0;
-  word-break: break-word;
-}
+    .nav a {
+        color: var(--neon);
+        margin: 0 10px;
+        cursor: pointer;
+        text-decoration: underline;
+    }
 
-textarea{
-  width:100%;
-  height:90px;
-}
+    .nav a:hover { color: #fff; }
 
-button{
-  margin:5px 0;
-  cursor:pointer;
-}
+    h2, h3 { color: var(--accent); }
 
-img.postimg{
-  max-width:220px;
-  display:block;
-  margin-top:5px;
-}
+    .post {
+        border: 1px solid var(--border);
+        background: var(--post-bg);
+        padding: 10px;
+        margin: 12px 0;
+        position: relative;
+    }
 
-.small{
-  font-size:12px;
-  opacity:0.6;
-}
+    .op-post {
+        border-left: 4px solid var(--accent);
+    }
 
-.reportBtn{
-  color:red;
-  cursor:pointer;
-  font-size:12px;
-}
+    .post-header {
+        font-size: 12px;
+        color: #88aa77;
+        margin-bottom: 6px;
+    }
 
-.adminPanel{
-  border:2px solid red;
-  padding:10px;
-  background:#fff0f0;
-  margin-top:10px;
-}
+    .post-number {
+        color: var(--neon);
+        cursor: pointer;
+    }
 
-.footer{
-  text-align:center;
-  margin-top:60px;
-  opacity:0.6;
-  font-size:12px;
-}
+    .post-name {
+        color: var(--accent);
+        font-weight: bold;
+    }
+
+    .quote {
+        color: var(--accent);
+        display: block;
+        margin: 4px 0;
+    }
+
+    img.post-image {
+        max-width: 280px;
+        border: 1px solid var(--border);
+        margin: 8px 0;
+        cursor: zoom-in;
+        display: block;
+    }
+
+    textarea, input[type="text"] {
+        width: 100%;
+        background: #1f2a1f;
+        color: var(--text);
+        border: 1px solid var(--border);
+        padding: 8px;
+        margin: 6px 0;
+    }
+
+    button {
+        background: #556b2f;
+        border: 1px solid var(--accent);
+        color: #fff;
+        padding: 8px 16px;
+        cursor: pointer;
+        margin: 5px 5px 5px 0;
+    }
+
+    button:hover {
+        background: #6b8e23;
+    }
+
+    .thread-container {
+        max-width: 920px;
+        margin: 0 auto;
+    }
+
+    .reply {
+        margin-left: 40px;
+    }
+
+    .rules {
+        background: #1f2a1f;
+        padding: 15px;
+        border: 1px solid var(--border);
+        max-width: 700px;
+        margin: 20px auto;
+    }
+
+    .footer {
+        text-align: center;
+        margin-top: 100px;
+        font-size: 11px;
+        opacity: 0.5;
+    }
+
+    .gold { color: gold; font-weight: bold; }
 </style>
 </head>
-
 <body>
 
 <div class="header">
-  <img src="https://i.ibb.co/Q3XDDHYB/Chat-GPT-Image-22-2026-04-20-35-1.png">
-</div>
+    <img src="https://i.ibb.co/xtYZ6sjK/image.jpg" 
+         onerror="this.style.display='none';" 
+         alt="NEONVOID logo">
 
-<div class="nav">
-  <a onclick="showForum()">Forum</a>
-  <a onclick="showRules()">Rules</a>
-  <a onclick="openAdmin()">Admin</a>
+    <div class="nav">
+        <a onclick="go('forum')">Forum</a>
+        <a onclick="go('rules')">Rules</a>
+        <a onclick="board('frontline')">/frontline/</a>
+        <a onclick="board('intel')">/intel/</a>
+        <a onclick="board('field')">/field/</a>
+        <a onclick="board('art')">/art/</a>
+    </div>
 </div>
 
 <button onclick="newThread()">New Thread</button>
+<button onclick="adminPanel()">Admin</button>
 
-<div id="app"></div>
+<div id="app" class="thread-container"></div>
 
 <div class="footer">
-Created in 2026 — For you with soul
+    NEONVOID.BBS © 2026 — Анонимное общение без цензуры
 </div>
 
 <script type="module">
-
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getFirestore,
-  collection,
-  addDoc,
-  query,
-  orderBy,
-  onSnapshot
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    getFirestore,
+    collection,
+    addDoc,
+    updateDoc,
+    doc,
+    query,
+    orderBy,
+    onSnapshot,
+    serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 import {
-  getStorage,
-  ref,
-  uploadBytes,
-  getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
+    getStorage,
+    ref,
+    uploadBytes,
+    getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js";
 
-/* ===== FIREBASE ===== */
 const firebaseConfig = {
-  apiKey: "AIzaSyAtTTArBPBNHmZZJSytqjaRwA3nXvANBV0",
-  authDomain: "neonevvvoid.firebaseapp.com",
-  projectId: "neonevvvoid",
-  storageBucket: "neonevvvoid.firebasestorage.app",
-  messagingSenderId: "795809430469",
-  appId: "1:795809430469:web:21f76f22dee7f7c14329ac"
+    apiKey: "AIzaSyAtTTArBPBNHmZZJSytqjaRwA3nXvANBV0",
+    authDomain: "neonevvvoid.firebaseapp.com",
+    projectId: "neonevvvoid",
+    storageBucket: "neonevvvoid.firebasestorage.app",
+    messagingSenderId: "795809430469",
+    appId: "1:795809430469:web:21f76f22dee7f7c14329ac"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== STATE ===== */
+let currentBoard = "frontline";
 let currentThread = null;
-let postsCache = [];
-let reportsCache = [];
+let lastPostTime = 0;
+let view = "forum";
 
-/* ===== USER ===== */
-function user(){
-  let id = localStorage.getItem("id");
-  if(!id){
-    id="anon-"+Math.floor(Math.random()*99999);
-    localStorage.setItem("id",id);
-  }
-  return id;
+/* Аноним */
+function getAnon() {
+    return "Аноним"; // можно сделать рандомный трипкод позже
 }
 
-/* ===== ROLE SYSTEM ===== */
-function decodeKey(){
-  return atob("TlYtUk9PVC0yMDI2"); // NV-ROOT-2026
-}
-
-function isAdmin(){
-  return localStorage.getItem("role") === "admin";
-}
-
-/* ===== LISTEN POSTS ===== */
-const qPosts = query(collection(db,"posts"),orderBy("id","asc"));
-onSnapshot(qPosts,(snap)=>{
-  postsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
-  if(currentThread) renderPosts();
-});
-
-/* ===== LISTEN REPORTS ===== */
-const qReports = query(collection(db,"reports"));
-onSnapshot(qReports,(snap)=>{
-  reportsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
-});
-
-/* ===== NAV ===== */
-window.showForum = function(){
-  location.reload();
-};
-
-window.showRules = function(){
-  document.getElementById("app").innerHTML = `
-    <div class="post">
-      <h3>RULES</h3>
-      <p>Не спамить</p>
-      <p>Не доксить</p>
-      <p>Анонимность обязательна</p>
-    </div>
-  `;
-};
-
-/* ===== THREADS ===== */
-window.newThread = async function(){
-
-  let t=prompt("Title:");
-  let c=prompt("Text:");
-  if(!t||!c) return;
-
-  await addDoc(collection(db,"threads"),{
-    title:t,
-    content:c,
-    createdAt:Date.now()
-  });
-};
-
-/* ===== OPEN THREAD ===== */
-window.openThread = function(id,t,c){
-
-  currentThread = id;
-
-  document.getElementById("app").innerHTML = `
-    <h3>${t}</h3>
-    <div class="post">${c}</div>
-
-    <textarea id="txt"></textarea>
-    <input type="file" id="img">
-
-    <button onclick="reply()">Reply</button>
-
-    <div id="posts"></div>
-  `;
-
-  renderPosts();
-};
-
-/* ===== REPLY ===== */
-window.reply = async function(){
-
-  let txt=document.getElementById("txt").value;
-  let file=document.getElementById("img").files[0];
-
-  let img=null;
-
-  if(file){
-    let r=ref(storage,"img/"+Date.now()+file.name);
-    await uploadBytes(r,file);
-    img=await getDownloadURL(r);
-  }
-
-  await addDoc(collection(db,"posts"),{
-    threadId:currentThread,
-    content:txt,
-    author:user(),
-    image:img,
-    id:Date.now()
-  });
-};
-
-/* ===== REPORT ===== */
-window.reportPost = async function(postId){
-
-  await addDoc(collection(db,"reports"),{
-    postId:postId,
-    time:Date.now()
-  });
-
-  alert("Reported");
-};
-
-/* ===== ADMIN ===== */
-window.openAdmin = function(){
-
-  let key = prompt("Admin key:");
-
-  if(key === decodeKey()){
-    localStorage.setItem("role","admin");
-  }
-
-  if(!isAdmin()){
-    alert("ACCESS DENIED");
-    return;
-  }
-
-  renderAdmin();
-};
-
-/* ===== ADMIN PANEL ===== */
-function renderAdmin(){
-
-  let html = `<div class="adminPanel"><h3>ADMIN PANEL v17</h3>`;
-
-  html += `<p>Role: ADMIN</p>`;
-
-  html += `<h4>Reports</h4>`;
-
-  for(let r of reportsCache){
-    html += `
-      <div class="post">
-        Report → PostID: ${r.postId}
-      </div>
-    `;
-  }
-
-  html += `</div>`;
-
-  document.getElementById("app").innerHTML = html;
-}
-
-/* ===== POSTS ===== */
-function renderPosts(){
-
-  let html="";
-
-  for(let p of postsCache){
-
-    if(p.threadId === currentThread){
-
-      html += `
-      <div class="post">
-        <div class="small">${p.author}</div>
-        ${p.content || ""}
-        ${p.image ? `<img class="postimg" src="${p.image}">` : ""}
-        <div class="reportBtn" onclick="reportPost('${p.id}')">report</div>
-      </div>`;
+/* Анти-спам */
+function canPost() {
+    const now = Date.now();
+    if (now - lastPostTime < 2500) {
+        alert("Не спамь, анон. Подожди пару секунд.");
+        return false;
     }
-  }
-
-  document.getElementById("posts").innerHTML = html;
+    lastPostTime = now;
+    return true;
 }
 
+/* Навигация */
+window.go = function(v) {
+    view = v;
+    render();
+};
+
+window.board = function(b) {
+    currentBoard = b;
+    view = "forum";
+    render();
+};
+
+/* Создание нового треда */
+window.newThread = async function() {
+    if (!canPost()) return;
+
+    const title = prompt("Название треда:");
+    const content = prompt("Текст сообщения:");
+    if (!title || !content) return;
+
+    try {
+        await addDoc(collection(db, "threads"), {
+            title: title,
+            content: content,
+            board: currentBoard,
+            author: getAnon(),
+            createdAt: serverTimestamp(),
+            bumpedAt: serverTimestamp()
+        });
+        alert("Тред создан!");
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка при создании треда");
+    }
+};
+
+/* Открытие треда */
+window.openThread = function(id, title, content) {
+    currentThread = id;
+
+    let html = `
+        <h2>${title}</h2>
+        <div class="post op-post">
+            <div class="post-header">
+                <span class="post-number">№${id.slice(0,8)}</span> 
+                <span class="post-name">${getAnon()}</span> 
+                <span>Original Post</span>
+            </div>
+            <div>${content.replace(/\n/g, '<br>')}</div>
+        </div>
+
+        <div id="replies"></div>
+
+        <h3>Ответить в тред</h3>
+        <input type="text" id="name" value="Аноним" placeholder="Имя">
+        <textarea id="txt" placeholder="Твой комментарий..."></textarea>
+        <input type="file" id="img" accept="image/*">
+        <button onclick="reply()">Отправить</button>
+        <button onclick="render()">← Назад к списку</button>
+    `;
+
+    document.getElementById("app").innerHTML = html;
+    listenReplies(id);
+};
+
+/* Добавление ответа */
+window.reply = async function() {
+    if (!canPost()) return;
+
+    const txt = document.getElementById("txt").value.trim();
+    const name = document.getElementById("name").value.trim() || "Аноним";
+    const file = document.getElementById("img").files[0];
+
+    if (!txt && !file) {
+        alert("Напиши хоть что-то или прикрепи картинку");
+        return;
+    }
+
+    let imgUrl = null;
+
+    if (file) {
+        try {
+            const storageRef = ref(storage, `images/\( {Date.now()}_ \){file.name}`);
+            await uploadBytes(storageRef, file);
+            imgUrl = await getDownloadURL(storageRef);
+        } catch (e) {
+            console.error(e);
+            alert("Не удалось загрузить изображение");
+        }
+    }
+
+    try {
+        await addDoc(collection(db, "posts"), {
+            threadId: currentThread,
+            content: txt,
+            author: name,
+            image: imgUrl,
+            createdAt: serverTimestamp()
+        });
+
+        await updateDoc(doc(db, "threads", currentThread), {
+            bumpedAt: serverTimestamp()
+        });
+
+        document.getElementById("txt").value = "";
+        document.getElementById("img").value = "";
+    } catch (e) {
+        console.error(e);
+        alert("Ошибка отправки");
+    }
+};
+
+/* Прослушка ответов в реальном времени */
+function listenReplies(threadId) {
+    const q = query(
+        collection(db, "posts"),
+        orderBy("createdAt", "asc")
+    );
+
+    onSnapshot(q, (snapshot) => {
+        let repliesHTML = "";
+        snapshot.forEach((docSnap) => {
+            const p = docSnap.data();
+            if (p.threadId !== threadId) return;
+
+            let imageHTML = p.image ? `<img src="${p.image}" class="post-image" onclick="this.style.maxWidth = this.style.maxWidth === '90%' ? '280px' : '90%'">` : "";
+
+            repliesHTML += `
+                <div class="post reply">
+                    <div class="post-header">
+                        <span class="post-number">№${docSnap.id.slice(0,8)}</span> 
+                        <span class="post-name">${p.author || "Аноним"}</span>
+                    </div>
+                    ${imageHTML}
+                    <div>${(p.content || "").replace(/\n/g, '<br>')}</div>
+                </div>
+            `;
+        });
+
+        const repliesDiv = document.getElementById("replies");
+        if (repliesDiv) repliesDiv.innerHTML = repliesHTML;
+    });
+}
+
+/* Правила */
+function rulesPage() {
+    document.getElementById("app").innerHTML = `
+        <div class="rules">
+            <h3>Правила NEONVOID.BBS</h3>
+            <p>• Анонимность — святое.<br>
+            • Разрешено почти всё, что не нарушает закон РФ.<br>
+            • Не докси, не угрожай, не спамь.<br>
+            • Модерация окончательна и без объяснений.</p>
+            <p class="gold">Наслаждайся свободой, анон.</p>
+        </div>
+    `;
+}
+
+/* Основной рендер списка тредов */
+function render() {
+    if (view === "rules") {
+        rulesPage();
+        return;
+    }
+
+    const q = query(collection(db, "threads"), orderBy("bumpedAt", "desc"));
+
+    onSnapshot(q, (snapshot) => {
+        let html = `<h3>${currentBoard.toUpperCase()} — Активные треды</h3>`;
+
+        snapshot.forEach((docSnap) => {
+            const t = docSnap.data();
+            if (t.board !== currentBoard) return;
+
+            html += `
+                <div class="post" onclick="openThread('\( {docSnap.id}', ' \){t.title.replace(/'/g, "\\'")}', '${t.content.replace(/'/g, "\\'")}')">
+                    <b>${t.title}</b><br>
+                    <small>\( {t.content.substring(0, 120)} \){t.content.length > 120 ? '...' : ''}</small>
+                </div>
+            `;
+        });
+
+        if (html === `<h3>${currentBoard.toUpperCase()} — Активные треды</h3>`) {
+            html += `<p>Пока нет тредов на этой доске. Создай первый!</p>`;
+        }
+
+        document.getElementById("app").innerHTML = html;
+    });
+}
+
+/* Заглушка админки */
+window.adminPanel = function() {
+    alert("Админ-панель пока в разработке.\n\nДля модерации используй Firebase Console.");
+};
+
+/* Запуск */
+render();
 </script>
 
 </body>
