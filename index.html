@@ -2,17 +2,19 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID v14 STABLE</title>
+<title>NEONVOID BBS v15</title>
 
 <style>
 body{
   font-family: Arial;
   background:#eef2ff;
   margin:20px;
+  color:#000;
 }
 
 .header{
   text-align:center;
+  margin-bottom:10px;
 }
 
 .header img{
@@ -20,9 +22,13 @@ body{
   width:100%;
 }
 
+.nav{
+  margin:10px 0;
+}
+
 .nav a{
   color:#00f;
-  margin:0 6px;
+  margin-right:10px;
   cursor:pointer;
   text-decoration: underline;
 }
@@ -56,15 +62,11 @@ img.postimg{
   cursor:pointer;
 }
 
-.deleted{
-  opacity:0.5;
-  font-style:italic;
-}
-
 .footer{
   text-align:center;
   margin-top:60px;
   opacity:0.6;
+  font-size:12px;
 }
 </style>
 </head>
@@ -84,7 +86,9 @@ img.postimg{
 
 <div id="app"></div>
 
-<div class="footer">NEONVOID v14 STABLE</div>
+<div class="footer">
+Created in 2026 — For you with soul
+</div>
 
 <script type="module">
 
@@ -120,59 +124,43 @@ const db = getFirestore(app);
 const storage = getStorage(app);
 
 /* ===== STATE (STABLE CORE) ===== */
-let state = {
-  view:"forum",
-  thread:null
-};
-
-/* ===== GLOBAL CACHE (IMPORTANT FIX) ===== */
-let threadsCache = [];
-let postsCache = [];
+let currentThread = null;
+let unsubThreads = null;
+let unsubPosts = null;
 
 /* ===== USER ID ===== */
 function user(){
   let id = localStorage.getItem("id");
   if(!id){
-    id="anon-"+Math.floor(Math.random()*99999);
+    id = "anon-" + Math.floor(Math.random()*99999);
     localStorage.setItem("id",id);
   }
   return id;
 }
 
-/* ===== INIT LISTENERS ONCE (CRITICAL FIX) ===== */
-const qThreads = query(collection(db,"threads"),orderBy("createdAt","desc"));
-onSnapshot(qThreads,(snap)=>{
-  threadsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
-  if(state.view==="forum") renderForum();
-});
-
-const qPosts = query(collection(db,"posts"));
-onSnapshot(qPosts,(snap)=>{
-  postsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
-});
-
 /* ===== NAV ===== */
 window.showForum = function(){
-  state.view="forum";
   renderForum();
 };
 
 window.showRules = function(){
-  document.getElementById("app").innerHTML=`
+  document.getElementById("app").innerHTML = `
     <div class="post">
       <h3>RULES</h3>
-      <p>Не мешай другим пользователям.</p>
-      <p>Разрешено всё в рамках закона.</p>
-      <p>Анонимность обязательна.</p>
-    </div>`;
+      <p>• Не мешай другим пользователям</p>
+      <p>• Разрешено всё в рамках закона</p>
+      <p>• Анонимность обязательна</p>
+      <p>• Модерация имеет право удалять контент</p>
+    </div>
+  `;
 };
 
-/* ===== THREAD CREATE ===== */
+/* ===== CREATE THREAD ===== */
 window.newThread = async function(){
 
-  let t=prompt("Title:");
-  let c=prompt("Text:");
-  if(!t||!c) return;
+  let t = prompt("Title:");
+  let c = prompt("Text:");
+  if(!t || !c) return;
 
   await addDoc(collection(db,"threads"),{
     title:t,
@@ -184,10 +172,9 @@ window.newThread = async function(){
 /* ===== OPEN THREAD ===== */
 window.openThread = function(id,t,c){
 
-  state.thread=id;
-  state.view="thread";
+  currentThread = id;
 
-  document.getElementById("app").innerHTML=`
+  document.getElementById("app").innerHTML = `
     <h3>${t}</h3>
     <div class="post">${c}</div>
 
@@ -202,79 +189,96 @@ window.openThread = function(id,t,c){
   renderPosts();
 };
 
-/* ===== REPLY (FIXED IMAGE SAFE) ===== */
+/* ===== REPLY ===== */
 window.reply = async function(){
 
-  let txt=document.getElementById("txt").value;
-  let file=document.getElementById("img").files[0];
+  let txt = document.getElementById("txt").value;
+  let file = document.getElementById("img").files[0];
 
-  let img=null;
+  let img = null;
 
   if(file){
-    let r=ref(storage,"img/"+Date.now()+file.name);
+    let r = ref(storage,"img/"+Date.now()+file.name);
     await uploadBytes(r,file);
-    img=await getDownloadURL(r);
+    img = await getDownloadURL(r);
   }
 
   await addDoc(collection(db,"posts"),{
-    threadId:state.thread,
-    content:txt,
-    author:user(),
-    image:img,
-    id:Date.now(),
-    deleted:false
+    threadId: currentThread,
+    content: txt,
+    author: user(),
+    image: img,
+    id: Date.now()
   });
 
-  document.getElementById("txt").value="";
-  document.getElementById("img").value="";
+  document.getElementById("txt").value = "";
+  document.getElementById("img").value = "";
 };
 
-/* ===== SAFE RENDER FORUM ===== */
+/* ===== FORUM RENDER (SAFE) ===== */
 function renderForum(){
 
-  let html="<h3>BOARD</h3>";
+  if(unsubThreads) unsubThreads();
 
-  for(let t of threadsCache){
+  const q = query(collection(db,"threads"),orderBy("createdAt","desc"));
 
-    html+=`
-    <div class="post">
-      <a onclick="openThread('${t.id}','${t.title}','${t.content}')">
-        <b>${t.title}</b>
-      </a><br>
-      ${t.content}
-    </div>`;
-  }
+  unsubThreads = onSnapshot(q,(snap)=>{
 
-  document.getElementById("app").innerHTML=html;
+    let html = "<h3>BOARD</h3>";
+
+    snap.forEach(d=>{
+      let t = d.data();
+
+      html += `
+      <div class="post">
+        <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
+          <b>${t.title}</b>
+        </a><br>
+        ${t.content}
+      </div>`;
+    });
+
+    document.getElementById("app").innerHTML = html;
+  });
 }
 
-/* ===== SAFE POSTS RENDER ===== */
+/* ===== POSTS RENDER ===== */
 function renderPosts(){
 
-  let html="";
+  if(unsubPosts) unsubPosts();
 
-  for(let p of postsCache){
+  const q = query(collection(db,"posts"));
 
-    if(p.threadId===state.thread){
+  unsubPosts = onSnapshot(q,(snap)=>{
 
-      let text=p.content||"";
+    let html = "";
 
-      /* >>reply highlight */
-      text = text.replace(/>>(\d+)/g,
-        `<span class="replyref">>>$1</span>`
-      );
+    snap.forEach(d=>{
+      let p = d.data();
 
-      html+=`
-      <div class="post ${p.deleted?'deleted':''}">
-        <b>${p.author}</b><br>
-        ${text}
-        ${p.image?`<img class="postimg" src="${p.image}">`:""}
-      </div>`;
-    }
-  }
+      if(p.threadId === currentThread){
 
-  document.getElementById("posts").innerHTML=html;
+        let text = p.content || "";
+
+        text = text.replace(/>>(\d+)/g,
+          `<span class="replyref">>>$1</span>`
+        );
+
+        html += `
+        <div class="post">
+          <b>${p.author}</b><br>
+          ${text}
+          ${p.image ? `<img class="postimg" src="${p.image}">` : ""}
+        </div>`;
+      }
+    });
+
+    document.getElementById("posts").innerHTML = html;
+  });
 }
+
+/* ===== INIT ===== */
+renderForum();
 
 </script>
 
