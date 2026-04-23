@@ -2,68 +2,70 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v9.1</title>
+<title>NEONVOID.BBS v9.2 — Анонимный борд 2012</title>
 <style>
     :root {
         --bg: #2f3b2f;
-        --post-bg: #3f4f3f;
+        --post: #3f4f3f;
         --border: #556b2f;
         --text: #e6f2e6;
         --accent: #9acd32;
         --neon: #b6ff8a;
+        --quote: #9acd32;
     }
 
     body {
         font-family: Arial, sans-serif;
         background: var(--bg);
         color: var(--text);
-        margin: 20px;
-        line-height: 1.5;
+        margin: 15px;
+        line-height: 1.45;
+        font-size: 13px;
     }
 
     .header {
         text-align: center;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
     }
 
     .header img {
-        max-width: 360px;
+        max-width: 380px;
         border: 2px solid var(--border);
-        box-shadow: 0 0 20px #000;
+        box-shadow: 0 0 25px #000;
     }
 
     .nav a {
         color: var(--neon);
-        margin: 0 10px;
-        cursor: pointer;
+        margin: 0 12px;
         text-decoration: underline;
+        cursor: pointer;
     }
 
-    .nav a:hover { color: #fff; }
-
-    h2, h3 { color: var(--accent); }
+    .nav a:hover { color: white; }
 
     .post {
         border: 1px solid var(--border);
-        background: var(--post-bg);
-        padding: 10px;
+        background: var(--post);
+        padding: 10px 12px;
         margin: 12px 0;
         position: relative;
     }
 
     .op-post {
-        border-left: 4px solid var(--accent);
+        border-left: 5px solid var(--accent);
+        background: #4a5a4a;
     }
 
     .post-header {
-        font-size: 12px;
         color: #88aa77;
-        margin-bottom: 6px;
+        font-size: 12px;
+        margin-bottom: 5px;
     }
 
     .post-number {
         color: var(--neon);
         cursor: pointer;
+        font-weight: bold;
     }
 
     .post-name {
@@ -72,18 +74,20 @@
     }
 
     .quote {
-        color: var(--accent);
+        color: var(--quote);
+        margin: 3px 0;
         display: block;
-        margin: 4px 0;
     }
 
     img.post-image {
-        max-width: 280px;
+        max-width: 300px;
         border: 1px solid var(--border);
-        margin: 8px 0;
+        margin: 8px 0 8px 0;
         cursor: zoom-in;
         display: block;
     }
+
+    .reply { margin-left: 45px; }
 
     textarea, input[type="text"] {
         width: 100%;
@@ -92,55 +96,44 @@
         border: 1px solid var(--border);
         padding: 8px;
         margin: 6px 0;
+        font-family: Arial;
     }
 
     button {
         background: #556b2f;
+        color: white;
         border: 1px solid var(--accent);
-        color: #fff;
-        padding: 8px 16px;
+        padding: 7px 14px;
         cursor: pointer;
-        margin: 5px 5px 5px 0;
+        margin: 4px 4px 4px 0;
     }
 
-    button:hover {
-        background: #6b8e23;
-    }
+    button:hover { background: #6b8e23; }
 
-    .thread-container {
-        max-width: 920px;
-        margin: 0 auto;
-    }
-
-    .reply {
-        margin-left: 40px;
-    }
+    .admin-btn { background: #9acd32; color: #000; font-weight: bold; }
 
     .rules {
         background: #1f2a1f;
         padding: 15px;
         border: 1px solid var(--border);
-        max-width: 700px;
+        max-width: 720px;
         margin: 20px auto;
     }
 
     .footer {
         text-align: center;
-        margin-top: 100px;
+        margin-top: 80px;
         font-size: 11px;
-        opacity: 0.5;
+        opacity: 0.6;
     }
 
-    .gold { color: gold; font-weight: bold; }
+    .gold { color: gold; }
 </style>
 </head>
 <body>
 
 <div class="header">
-    <img src="https://i.ibb.co/xtYZ6sjK/image.jpg" 
-         onerror="this.style.display='none';" 
-         alt="NEONVOID logo">
-
+    <img src="https://i.ibb.co/xtYZ6sjK/image.jpg" onerror="this.style.display='none'" alt="NEONVOID">
     <div class="nav">
         <a onclick="go('forum')">Forum</a>
         <a onclick="go('rules')">Rules</a>
@@ -151,13 +144,13 @@
     </div>
 </div>
 
-<button onclick="newThread()">New Thread</button>
-<button onclick="adminPanel()">Admin</button>
+<button onclick="newThread()">Новый тред</button>
+<button onclick="showAdminLogin()">Admin</button>
 
-<div id="app" class="thread-container"></div>
+<div id="app" style="max-width:920px; margin:0 auto;"></div>
 
 <div class="footer">
-    NEONVOID.BBS © 2026 — Анонимное общение без цензуры
+    NEONVOID.BBS 2012-style • Анонимы всегда правы • 2026
 </div>
 
 <script type="module">
@@ -168,6 +161,7 @@ import {
     addDoc,
     updateDoc,
     doc,
+    deleteDoc,
     query,
     orderBy,
     onSnapshot,
@@ -198,68 +192,75 @@ let currentBoard = "frontline";
 let currentThread = null;
 let lastPostTime = 0;
 let view = "forum";
+let isAdmin = false;
+const ADMIN_PASS = "AaAa2004ip";
 
-/* Аноним */
-function getAnon() {
-    return "Аноним"; // можно сделать рандомный трипкод позже
+// Проверка админа
+function checkAdmin() {
+    return localStorage.getItem("neonAdmin") === "true";
 }
 
-/* Анти-спам */
+// Логин админа
+window.showAdminLogin = function() {
+    const pass = prompt("Введите админ-пароль:");
+    if (pass === ADMIN_PASS) {
+        isAdmin = true;
+        localStorage.setItem("neonAdmin", "true");
+        alert("✅ Админ-доступ получен. Теперь можно удалять посты.");
+        render();
+    } else {
+        alert("Неверный пароль");
+    }
+};
+
+// Аноним
+function getAnon() {
+    return "Аноним";
+}
+
+// Анти-спам
 function canPost() {
     const now = Date.now();
-    if (now - lastPostTime < 2500) {
-        alert("Не спамь, анон. Подожди пару секунд.");
+    if (now - lastPostTime < 2000) {
+        alert("Не флуди, анон. Подожди 2 секунды.");
         return false;
     }
     lastPostTime = now;
     return true;
 }
 
-/* Навигация */
-window.go = function(v) {
-    view = v;
-    render();
-};
+window.go = function(v) { view = v; render(); };
+window.board = function(b) { currentBoard = b; view = "forum"; render(); };
 
-window.board = function(b) {
-    currentBoard = b;
-    view = "forum";
-    render();
-};
-
-/* Создание нового треда */
+// Новый тред
 window.newThread = async function() {
     if (!canPost()) return;
-
     const title = prompt("Название треда:");
-    const content = prompt("Текст сообщения:");
+    let content = prompt("Текст OP-поста:");
     if (!title || !content) return;
 
     try {
         await addDoc(collection(db, "threads"), {
-            title: title,
-            content: content,
+            title,
+            content,
             board: currentBoard,
             author: getAnon(),
             createdAt: serverTimestamp(),
             bumpedAt: serverTimestamp()
         });
-        alert("Тред создан!");
-    } catch (e) {
-        console.error(e);
-        alert("Ошибка при создании треда");
-    }
+        alert("Тред создан успешно!");
+    } catch(e) { console.error(e); alert("Ошибка создания треда"); }
 };
 
-/* Открытие треда */
+// Открытие треда
 window.openThread = function(id, title, content) {
     currentThread = id;
 
     let html = `
-        <h2>${title}</h2>
+        <h2 style="color:#9acd32">${title}</h2>
         <div class="post op-post">
             <div class="post-header">
-                <span class="post-number">№${id.slice(0,8)}</span> 
+                <span class="post-number" onclick="copyQuote('\( {id.slice(0,8)}')">№ \){id.slice(0,8)}</span> 
                 <span class="post-name">${getAnon()}</span> 
                 <span>Original Post</span>
             </div>
@@ -268,112 +269,126 @@ window.openThread = function(id, title, content) {
 
         <div id="replies"></div>
 
-        <h3>Ответить в тред</h3>
-        <input type="text" id="name" value="Аноним" placeholder="Имя">
-        <textarea id="txt" placeholder="Твой комментарий..."></textarea>
+        <h3>Ответить</h3>
+        <input type="text" id="name" value="Аноним" placeholder="Имя (по умолчанию Аноним)">
+        <textarea id="txt" placeholder="Сообщение..."></textarea>
         <input type="file" id="img" accept="image/*">
         <button onclick="reply()">Отправить</button>
-        <button onclick="render()">← Назад к списку</button>
+        <button onclick="render()">← Назад</button>
     `;
 
     document.getElementById("app").innerHTML = html;
     listenReplies(id);
 };
 
-/* Добавление ответа */
+// Копирование >>номер
+window.copyQuote = function(num) {
+    navigator.clipboard.writeText(">>" + num);
+    // alert(">>" + num + " скопировано");
+};
+
+// Добавление ответа
 window.reply = async function() {
     if (!canPost()) return;
 
     const txt = document.getElementById("txt").value.trim();
-    const name = document.getElementById("name").value.trim() || "Аноним";
+    const nameInput = document.getElementById("name").value.trim();
+    const author = nameInput || "Аноним";
     const file = document.getElementById("img").files[0];
 
-    if (!txt && !file) {
-        alert("Напиши хоть что-то или прикрепи картинку");
-        return;
-    }
+    if (!txt && !file) return alert("Напиши текст или добавь картинку");
 
     let imgUrl = null;
-
     if (file) {
         try {
-            const storageRef = ref(storage, `images/\( {Date.now()}_ \){file.name}`);
-            await uploadBytes(storageRef, file);
-            imgUrl = await getDownloadURL(storageRef);
-        } catch (e) {
-            console.error(e);
-            alert("Не удалось загрузить изображение");
-        }
+            const r = ref(storage, "images/" + Date.now() + "_" + file.name);
+            await uploadBytes(r, file);
+            imgUrl = await getDownloadURL(r);
+        } catch(e) { alert("Ошибка загрузки изображения"); }
     }
 
     try {
         await addDoc(collection(db, "posts"), {
             threadId: currentThread,
             content: txt,
-            author: name,
+            author: author,
             image: imgUrl,
             createdAt: serverTimestamp()
         });
 
-        await updateDoc(doc(db, "threads", currentThread), {
-            bumpedAt: serverTimestamp()
-        });
-
+        await updateDoc(doc(db, "threads", currentThread), { bumpedAt: serverTimestamp() });
         document.getElementById("txt").value = "";
         document.getElementById("img").value = "";
-    } catch (e) {
-        console.error(e);
-        alert("Ошибка отправки");
-    }
+    } catch(e) { console.error(e); alert("Ошибка отправки"); }
 };
 
-/* Прослушка ответов в реальном времени */
+// Прослушка ответов
 function listenReplies(threadId) {
-    const q = query(
-        collection(db, "posts"),
-        orderBy("createdAt", "asc")
-    );
+    const q = query(collection(db, "posts"), orderBy("createdAt", "asc"));
 
-    onSnapshot(q, (snapshot) => {
-        let repliesHTML = "";
-        snapshot.forEach((docSnap) => {
-            const p = docSnap.data();
+    onSnapshot(q, (snap) => {
+        let html = "";
+        snap.forEach((d) => {
+            const p = d.data();
             if (p.threadId !== threadId) return;
 
-            let imageHTML = p.image ? `<img src="${p.image}" class="post-image" onclick="this.style.maxWidth = this.style.maxWidth === '90%' ? '280px' : '90%'">` : "";
+            const imgHTML = p.image ? 
+                `<img src="${p.image}" class="post-image" onclick="this.style.maxWidth=this.style.maxWidth==='95%'?'300px':'95%'">` : "";
 
-            repliesHTML += `
+            const deleteBtn = isAdmin ? 
+                `<button class="admin-btn" onclick="deletePost('\( {d.id}', ' \){threadId}')">Удалить</button>` : "";
+
+            html += `
                 <div class="post reply">
                     <div class="post-header">
-                        <span class="post-number">№${docSnap.id.slice(0,8)}</span> 
+                        <span class="post-number" onclick="copyQuote('\( {d.id.slice(0,8)}')">№ \){d.id.slice(0,8)}</span> 
                         <span class="post-name">${p.author || "Аноним"}</span>
                     </div>
-                    ${imageHTML}
+                    ${imgHTML}
                     <div>${(p.content || "").replace(/\n/g, '<br>')}</div>
+                    ${deleteBtn}
                 </div>
             `;
         });
-
         const repliesDiv = document.getElementById("replies");
-        if (repliesDiv) repliesDiv.innerHTML = repliesHTML;
+        if (repliesDiv) repliesDiv.innerHTML = html;
     });
 }
 
-/* Правила */
+// Удаление поста (только админ)
+window.deletePost = async function(postId, threadId) {
+    if (!confirm("Удалить этот пост?")) return;
+    try {
+        await deleteDoc(doc(db, "posts", postId));
+        alert("Пост удалён");
+    } catch(e) { alert("Ошибка удаления"); }
+};
+
+// Удаление всего треда (админ)
+async function deleteThread(threadId) {
+    if (!confirm("Удалить весь тред?")) return;
+    // В реальном проекте нужно удалять все посты + тред, здесь упрощённо
+    try {
+        await deleteDoc(doc(db, "threads", threadId));
+        render();
+    } catch(e) { alert("Ошибка"); }
+}
+
+// Страница правил
 function rulesPage() {
     document.getElementById("app").innerHTML = `
         <div class="rules">
-            <h3>Правила NEONVOID.BBS</h3>
-            <p>• Анонимность — святое.<br>
-            • Разрешено почти всё, что не нарушает закон РФ.<br>
-            • Не докси, не угрожай, не спамь.<br>
-            • Модерация окончательна и без объяснений.</p>
-            <p class="gold">Наслаждайся свободой, анон.</p>
+            <h3>Правила NEONVOID.BBS (2012 style)</h3>
+            <p>• Анонимность — закон.<br>
+            • Разрешено всё, что не нарушает законы РФ.<br>
+            • Нет докса, спама, угроз.<br>
+            • Админ всегда прав.</p>
+            <p class="gold">Постите, тролльте, отдыхайте.</p>
         </div>
     `;
 }
 
-/* Основной рендер списка тредов */
+// Основной рендер списка тредов
 function render() {
     if (view === "rules") {
         rulesPage();
@@ -382,35 +397,35 @@ function render() {
 
     const q = query(collection(db, "threads"), orderBy("bumpedAt", "desc"));
 
-    onSnapshot(q, (snapshot) => {
-        let html = `<h3>${currentBoard.toUpperCase()} — Активные треды</h3>`;
+    onSnapshot(q, (snap) => {
+        let html = `<h3 style="color:#9acd32">${currentBoard.toUpperCase()} — Треды</h3>`;
 
-        snapshot.forEach((docSnap) => {
-            const t = docSnap.data();
+        snap.forEach((d) => {
+            const t = d.data();
             if (t.board !== currentBoard) return;
 
+            const deleteBtn = isAdmin ? 
+                `<button class="admin-btn" onclick="event.stopImmediatePropagation(); deleteThread('${d.id}')">Удалить тред</button>` : "";
+
             html += `
-                <div class="post" onclick="openThread('\( {docSnap.id}', ' \){t.title.replace(/'/g, "\\'")}', '${t.content.replace(/'/g, "\\'")}')">
+                <div class="post" onclick="openThread('\( {d.id}', ' \){t.title.replace(/'/g,"\\'")}', '${t.content.replace(/'/g,"\\'")}')">
                     <b>${t.title}</b><br>
-                    <small>\( {t.content.substring(0, 120)} \){t.content.length > 120 ? '...' : ''}</small>
+                    <small>\( {t.content.substring(0,140)} \){t.content.length>140?'...':''}</small>
+                    ${deleteBtn}
                 </div>
             `;
         });
 
-        if (html === `<h3>${currentBoard.toUpperCase()} — Активные треды</h3>`) {
-            html += `<p>Пока нет тредов на этой доске. Создай первый!</p>`;
+        if (!snap.docs.some(d => d.data().board === currentBoard)) {
+            html += `<p>Тредов пока нет. Создай первый!</p>`;
         }
 
         document.getElementById("app").innerHTML = html;
     });
 }
 
-/* Заглушка админки */
-window.adminPanel = function() {
-    alert("Админ-панель пока в разработке.\n\nДля модерации используй Firebase Console.");
-};
-
-/* Запуск */
+// Запуск
+isAdmin = checkAdmin();
 render();
 </script>
 
