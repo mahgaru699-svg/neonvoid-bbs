@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v13</title>
+<title>NEONVOID.BBS SAFE</title>
 
 <style>
 body{
@@ -20,39 +20,31 @@ body{
   width:100%;
 }
 
+.nav a{
+  color:#00f;
+  margin:0 6px;
+  cursor:pointer;
+  text-decoration: underline;
+}
+
 .post{
   border:1px solid #ccc;
   background:#fff;
   padding:8px;
   margin:6px 0;
-  word-break: break-word;
 }
 
-textarea{width:100%;height:90px;}
-
-button{cursor:pointer;margin:4px 0;}
-
-img.postimg{max-width:200px;display:block;margin-top:5px;}
-
-.small{
-  font-size:12px;
-  opacity:0.6;
+textarea{
+  width:100%;
+  height:90px;
 }
 
-.replyref{
-  color:#00f;
-  cursor:pointer;
-}
+button{margin:4px 0;cursor:pointer;}
 
-.report{
-  color:red;
-  cursor:pointer;
-  font-size:12px;
-}
-
-.locked{
-  background:#ffecec;
-  border:1px solid red;
+img.postimg{
+  max-width:220px;
+  display:block;
+  margin-top:5px;
 }
 
 .footer{
@@ -69,11 +61,16 @@ img.postimg{max-width:200px;display:block;margin-top:5px;}
   <img src="https://i.ibb.co/Q3XDDHYB/Chat-GPT-Image-22-2026-04-20-35-1.png">
 </div>
 
+<div class="nav">
+  <a onclick="goForum()">Forum</a>
+  <a onclick="goRules()">Rules</a>
+</div>
+
 <button onclick="newThread()">New Thread</button>
 
 <div id="app"></div>
 
-<div class="footer">NEONVOID v13</div>
+<div class="footer">NEONVOID SAFE MODE</div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
@@ -81,8 +78,6 @@ import {
   getFirestore,
   collection,
   addDoc,
-  updateDoc,
-  doc,
   query,
   orderBy,
   onSnapshot
@@ -108,21 +103,36 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== STATE ===== */
-let state = { thread:null };
-let unsub=null;
+/* ===== SAFE STATE ===== */
+let currentThread = null;
+let unsub = null;
 
 /* ===== USER ===== */
 function user(){
-  let id=localStorage.getItem("id");
+  let id = localStorage.getItem("id");
   if(!id){
-    id="anon"+Math.floor(Math.random()*99999);
+    id="anon"+Math.floor(Math.random()*9999);
     localStorage.setItem("id",id);
   }
   return id;
 }
 
-/* ===== THREAD CREATE ===== */
+/* ===== NAV SAFE ===== */
+window.goForum = function(){
+  renderForum();
+};
+
+window.goRules = function(){
+  document.getElementById("app").innerHTML=`
+    <div class="post">
+      <h3>Rules</h3>
+      <p>Не создавай проблем другим пользователям.</p>
+      <p>Разрешено всё в рамках закона.</p>
+      <p>Анонимность обязательна.</p>
+    </div>`;
+};
+
+/* ===== THREAD ===== */
 window.newThread = async function(){
 
   let t=prompt("Title:");
@@ -132,16 +142,14 @@ window.newThread = async function(){
   await addDoc(collection(db,"threads"),{
     title:t,
     content:c,
-    board:"main",
-    createdAt:Date.now(),
-    locked:false
+    createdAt:Date.now()
   });
 };
 
 /* ===== OPEN THREAD ===== */
 window.openThread = function(id,t,c){
 
-  state.thread=id;
+  currentThread=id;
 
   document.getElementById("app").innerHTML=`
     <h3>${t}</h3>
@@ -149,16 +157,15 @@ window.openThread = function(id,t,c){
 
     <textarea id="txt"></textarea>
     <input type="file" id="img">
-
     <button onclick="reply()">Reply</button>
 
     <div id="posts"></div>
   `;
 
-  listen(id);
+  listenPosts(id);
 };
 
-/* ===== REPLY ===== */
+/* ===== REPLY SAFE ===== */
 window.reply = async function(){
 
   let txt=document.getElementById("txt").value;
@@ -173,32 +180,21 @@ window.reply = async function(){
   }
 
   await addDoc(collection(db,"posts"),{
-    threadId:state.thread,
+    threadId:currentThread,
     content:txt,
     author:user(),
-    image:img,
-    id:Date.now(),
-    reports:0
-  });
-
-  await updateDoc(doc(db,"threads",state.thread),{
-    bumpedAt:Date.now()
+    image:img
   });
 };
 
-/* ===== REPORT ===== */
-window.reportPost = async function(postId){
-  alert("reported: "+postId);
-};
-
-/* ===== LISTENER (FIXED CORE) ===== */
-function listen(id){
+/* ===== LISTENER SAFE ===== */
+function listenPosts(id){
 
   if(unsub) unsub();
 
-  const q=query(collection(db,"posts"),orderBy("id","asc"));
+  const q=query(collection(db,"posts"));
 
-  unsub=onSnapshot(q,(snap)=>{
+  unsub = onSnapshot(q,(snap)=>{
 
     let html="";
 
@@ -206,23 +202,11 @@ function listen(id){
       let p=d.data();
 
       if(p.threadId===id){
-
-        let text=p.content||"";
-
-        /* >>reply parsing */
-        text = text.replace(/>>(\d+)/g,
-          `<span class="replyref">>>$1</span>`
-        );
-
         html+=`
         <div class="post">
-          <div class="small">${p.author} #${p.id}</div>
-
-          ${text}
-
+          <b>${p.author}</b><br>
+          ${p.content||""}
           ${p.image?`<img class="postimg" src="${p.image}">`:""}
-
-          <div class="report" onclick="reportPost('${d.id}')">report</div>
         </div>`;
       }
     });
@@ -231,6 +215,34 @@ function listen(id){
   });
 }
 
+/* ===== RENDER FORUM ===== */
+function renderForum(){
+
+  const q=query(collection(db,"threads"),orderBy("createdAt","desc"));
+
+  if(unsub) unsub();
+
+  unsub = onSnapshot(q,(snap)=>{
+
+    let html="<h3>BOARD</h3>";
+
+    snap.forEach(d=>{
+      let t=d.data();
+
+      html+=`
+      <div class="post">
+        <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
+          <b>${t.title}</b>
+        </a><br>
+        ${t.content}
+      </div>`;
+    });
+
+    document.getElementById("app").innerHTML=html;
+  });
+}
+
+renderForum();
 </script>
 
 </body>
