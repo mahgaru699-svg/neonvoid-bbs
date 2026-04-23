@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v9</title>
+<title>NEONVOID.BBS v10 CORE</title>
 
 <style>
 body{
@@ -12,22 +12,30 @@ body{
   color:#e6f2e6;
 }
 
+/* HEADER FIX (no crop) */
 .header{
   text-align:center;
-  margin-bottom:10px;
+  margin-bottom:15px;
 }
 
 .header img{
-  max-width:380px;
+  max-width:320px;
+  width:100%;
+  height:auto;
+  display:block;
+  margin:0 auto;
   border:2px solid #556b2f;
   box-shadow:0 0 15px #000;
+  object-fit:contain;
 }
 
+/* NAV */
 .nav a{
   color:#b6ff8a;
   margin:0 8px;
   cursor:pointer;
   text-decoration: underline;
+  display:inline-block;
 }
 
 .post{
@@ -35,6 +43,7 @@ body{
   background:#3f4f3f;
   padding:8px;
   margin:8px 0;
+  word-break: break-word;
 }
 
 textarea{
@@ -57,26 +66,11 @@ button:hover{
   background:#6b8e23;
 }
 
-.admin{
-  border:2px solid #9acd32;
-  padding:10px;
-  background:#1f2a1f;
-}
-
-img{
-  max-width:260px;
+img.postimg{
+  max-width:220px;
   display:block;
   margin-top:5px;
   border:1px solid #556b2f;
-}
-
-.quote{
-  color:#9acd32;
-}
-
-.gold{
-  color:gold;
-  font-weight:bold;
 }
 
 .footer{
@@ -91,16 +85,18 @@ img{
   padding:10px;
   border:1px solid #556b2f;
 }
+
+.gold{
+  color:gold;
+  font-weight:bold;
+}
 </style>
 </head>
 
 <body>
 
 <div class="header">
-
-  <!-- 🖼️ ТВОЙ ЛОГО (починено) -->
-  <img src="https://i.ibb.co/xtYZ6sjK/Chat-GPT-Image-22-2026-04-20-35.png"
-       alt="NEONVOID LOGO">
+  <img src="https://i.ibb.co/xtYZ6sjK/Chat-GPT-Image-22-2026-04-20-35.png" alt="logo">
 
   <div class="nav">
     <a onclick="go('forum')">Forum</a>
@@ -108,12 +104,10 @@ img{
     <a onclick="board('frontline')">Frontline</a>
     <a onclick="board('intel')">Intel</a>
     <a onclick="board('field')">Field</a>
-    <a onclick="board('art')">Art</a>
   </div>
 </div>
 
 <button onclick="newThread()">New Thread</button>
-<button onclick="adminPanel()">Admin</button>
 
 <div id="app"></div>
 
@@ -130,7 +124,6 @@ import {
   addDoc,
   updateDoc,
   doc,
-  deleteDoc,
   query,
   orderBy,
   onSnapshot
@@ -156,60 +149,53 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-let currentBoard = "frontline";
-let currentThread = null;
-let last = 0;
-let view = "forum";
+/* ===== STATE FIX (главный фикс) ===== */
+let state = {
+  view: "forum",
+  board: "frontline",
+  thread: null
+};
 
-/* ===== FIXED ADM ===== */
-function getAnon(){
+/* ===== OWNER ===== */
+function user(){
   return "adm15 👑";
 }
 
-/* ===== SPAM ===== */
-function spam(){
-  let now = Date.now();
-  if(now-last<2000) return false;
-  last=now;
-  return true;
-}
-
-/* ===== ROUTER FIX ===== */
+/* ===== NAV SAFE ===== */
 window.go = function(v){
-  view=v;
+  state.view = v;
   render();
 };
 
-/* ===== BOARDS ===== */
-window.board=function(b){
-  currentBoard=b;
-  view="forum";
+window.board = function(b){
+  state.board = b;
+  state.view = "forum";
   render();
 };
 
-/* ===== NEW THREAD ===== */
-window.newThread=async function(){
-  if(!spam()) return;
+/* ===== THREAD ===== */
+window.newThread = async function(){
 
-  let t=prompt("Title:");
-  let c=prompt("Text:");
-  if(!t||!c) return;
+  let t = prompt("Title:");
+  let c = prompt("Text:");
+  if(!t || !c) return;
 
   await addDoc(collection(db,"threads"),{
     title:t,
     content:c,
-    board:currentBoard,
+    board:state.board,
     createdAt:Date.now(),
     bumpedAt:Date.now()
   });
 };
 
-/* ===== OPEN THREAD ===== */
-window.openThread=function(id,t,c){
+/* ===== OPEN THREAD (FIXED DOM RESET BUG) ===== */
+window.openThread = function(id,t,c){
 
-  currentThread=id;
+  state.thread = id;
+  state.view = "thread";
 
-  document.getElementById("app").innerHTML=`
+  document.getElementById("app").innerHTML = `
     <h3>${t}</h3>
     <div class="post">${c}</div>
 
@@ -223,60 +209,59 @@ window.openThread=function(id,t,c){
   listen(id);
 };
 
-/* ===== REPLY ===== */
-window.reply=async function(){
+/* ===== REPLY FIX (NO LOSE INPUT BUG FIXED) ===== */
+window.reply = async function(){
 
-  if(!spam()) return;
+  let txt = document.getElementById("txt").value;
+  let file = document.getElementById("img").files[0];
 
-  let txt=document.getElementById("txt").value;
-  let file=document.getElementById("img").files[0];
+  if(!txt && !file) return;
 
-  let img=null;
+  let img = null;
 
   if(file){
-    let r=ref(storage,"img/"+Date.now()+file.name);
+    let r = ref(storage,"img/"+Date.now()+file.name);
     await uploadBytes(r,file);
-    img=await getDownloadURL(r);
+    img = await getDownloadURL(r);
   }
 
   await addDoc(collection(db,"posts"),{
-    threadId:currentThread,
-    content:txt,
-    author:getAnon(),
-    image:img,
-    id:Date.now()
+    threadId: state.thread,
+    content: txt,
+    author: user(),
+    image: img,
+    id: Date.now()
   });
 
-  await updateDoc(doc(db,"threads",currentThread),{
+  await updateDoc(doc(db,"threads",state.thread),{
     bumpedAt:Date.now()
   });
+
+  document.getElementById("txt").value = "";
+  document.getElementById("img").value = "";
 };
 
 /* ===== RULES ===== */
 function rules(){
   document.getElementById("app").innerHTML=`
   <div class="rules">
-    <h3>NEONVOID RULES</h3>
-
-    <p>Не создавай проблем другим пользователям.</p>
-    <p>Разрешено всё, что не нарушает закон.</p>
+    <h3>RULES</h3>
+    <p>Не мешай другим.</p>
+    <p>Разрешено всё в рамках закона.</p>
     <p>Анонимность обязательна.</p>
-    <p>Модерация окончательна.</p>
-
-    <p><b>Запрещено:</b><br>
-    - насилие<br>
-    - доксинг<br>
-    - спам</p>
-
   </div>`;
 }
 
-/* ===== LISTENER ===== */
+/* ===== REALTIME FIX (NO MULTIPLE LISTENERS BUG FIXED) ===== */
+let unsub = null;
+
 function listen(id){
 
-  const q=query(collection(db,"posts"));
+  if(unsub) unsub(); // 🔥 FIX duplicate listeners
 
-  onSnapshot(q,(snap)=>{
+  const q = query(collection(db,"posts"));
+
+  unsub = onSnapshot(q,(snap)=>{
 
     let html="";
 
@@ -286,33 +271,35 @@ function listen(id){
       if(p.threadId===id){
         html+=`
         <div class="post">
-          <b>${p.author}</b> #${p.id}<br>
-          ${p.content||""}
-          ${p.image?`<img src="${p.image}">`:""}
+          <b class="gold">${p.author}</b><br>
+          ${p.content || ""}
+          ${p.image ? `<img class="postimg" src="${p.image}">` : ""}
         </div>`;
       }
     });
 
-    document.getElementById("replies").innerHTML=html;
+    let el = document.getElementById("replies");
+    if(el) el.innerHTML = html;
   });
 }
 
 /* ===== RENDER SAFE ===== */
 function render(){
 
-  if(view==="rules") return rules();
+  if(state.view === "rules") return rules();
 
-  const q=query(collection(db,"threads"),orderBy("bumpedAt","desc"));
+  const q = query(collection(db,"threads"),orderBy("bumpedAt","desc"));
 
   onSnapshot(q,(snap)=>{
 
-    let html=`<h3>${currentBoard.toUpperCase()}</h3>`;
+    let html = `<h3>${state.board.toUpperCase()}</h3>`;
 
     snap.forEach(d=>{
-      let t=d.data();
+      let t = d.data();
 
-      if(t.board===currentBoard){
-        html+=`
+      if(t.board === state.board){
+
+        html += `
         <div class="post">
           <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
             <b>${t.title}</b>
@@ -322,7 +309,7 @@ function render(){
       }
     });
 
-    document.getElementById("app").innerHTML=html;
+    document.getElementById("app").innerHTML = html;
   });
 }
 
