@@ -2,71 +2,62 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v11</title>
+<title>NEONVOID.BBS v13</title>
 
 <style>
 body{
   font-family: Arial;
   background:#eef2ff;
   margin:20px;
-  color:#000;
 }
 
 .header{
   text-align:center;
-  margin-bottom:10px;
 }
 
-/* FIXED LOGO (no wrapper, no crop) */
 .header img{
   max-width:420px;
   width:100%;
-  height:auto;
-  display:block;
-  margin:0 auto;
-  border:1px solid #ccc;
-}
-
-.nav a{
-  color:#00f;
-  margin:0 6px;
-  cursor:pointer;
-  text-decoration: underline;
 }
 
 .post{
   border:1px solid #ccc;
-  background:#f9f9f9;
+  background:#fff;
   padding:8px;
-  margin:8px 0;
+  margin:6px 0;
   word-break: break-word;
 }
 
-textarea{
-  width:100%;
-  height:90px;
+textarea{width:100%;height:90px;}
+
+button{cursor:pointer;margin:4px 0;}
+
+img.postimg{max-width:200px;display:block;margin-top:5px;}
+
+.small{
+  font-size:12px;
+  opacity:0.6;
 }
 
-button{
-  margin:5px 0;
+.replyref{
+  color:#00f;
   cursor:pointer;
 }
 
-img.postimg{
-  max-width:220px;
-  display:block;
-  margin-top:5px;
+.report{
+  color:red;
+  cursor:pointer;
+  font-size:12px;
 }
 
-.deleted{
-  opacity:0.5;
-  font-style:italic;
+.locked{
+  background:#ffecec;
+  border:1px solid red;
 }
 
 .footer{
   text-align:center;
   margin-top:60px;
-  font-size:12px;
   opacity:0.6;
 }
 </style>
@@ -75,28 +66,15 @@ img.postimg{
 <body>
 
 <div class="header">
-
-  <!-- 🖼️ FIXED LOGO (REAL IMAGE URL ONLY) -->
-  <img src="https://i.ibb.co/Q3XDDHYB/Chat-GPT-Image-22-2026-04-20-35-1.png" alt="logo">
-
-</div>
-
-<div class="nav">
-  <a onclick="go('forum')">Forum</a>
-  <a onclick="go('rules')">Rules</a>
-  <a onclick="board('frontline')">Frontline</a>
-  <a onclick="board('intel')">Intel</a>
+  <img src="https://i.ibb.co/Q3XDDHYB/Chat-GPT-Image-22-2026-04-20-35-1.png">
 </div>
 
 <button onclick="newThread()">New Thread</button>
 
 <div id="app"></div>
 
-<div class="footer">
-Created in 2026 — For you with soul
-</div>
+<div class="footer">NEONVOID v13</div>
 
-<!-- FIREBASE -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
@@ -130,50 +108,33 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== STATE SAFE ===== */
-let state = {
-  view:"forum",
-  board:"frontline",
-  thread:null
-};
-
-let unsubPosts = null;
-let unsubThreads = null;
+/* ===== STATE ===== */
+let state = { thread:null };
+let unsub=null;
 
 /* ===== USER ===== */
 function user(){
-  let id = localStorage.getItem("id");
+  let id=localStorage.getItem("id");
   if(!id){
-    id = "anon-" + Math.floor(Math.random()*9999);
-    localStorage.setItem("id", id);
+    id="anon"+Math.floor(Math.random()*99999);
+    localStorage.setItem("id",id);
   }
   return id;
 }
 
-/* ===== NAV ===== */
-window.go = function(v){
-  state.view=v;
-  render();
-};
-
-window.board = function(b){
-  state.board=b;
-  state.view="forum";
-  render();
-};
-
-/* ===== THREAD CREATE (SAFE) ===== */
+/* ===== THREAD CREATE ===== */
 window.newThread = async function(){
 
-  let t = prompt("Title:");
-  let c = prompt("Text:");
-  if(!t || !c) return;
+  let t=prompt("Title:");
+  let c=prompt("Text:");
+  if(!t||!c) return;
 
   await addDoc(collection(db,"threads"),{
     title:t,
     content:c,
-    board:state.board,
-    createdAt:Date.now()
+    board:"main",
+    createdAt:Date.now(),
+    locked:false
   });
 };
 
@@ -181,7 +142,6 @@ window.newThread = async function(){
 window.openThread = function(id,t,c){
 
   state.thread=id;
-  state.view="thread";
 
   document.getElementById("app").innerHTML=`
     <h3>${t}</h3>
@@ -195,28 +155,21 @@ window.openThread = function(id,t,c){
     <div id="posts"></div>
   `;
 
-  listenPosts(id);
+  listen(id);
 };
 
-/* ===== REPLY (FIXED IMAGE BUG FINAL) ===== */
+/* ===== REPLY ===== */
 window.reply = async function(){
 
-  let txt = document.getElementById("txt").value;
-  let file = document.getElementById("img").files[0];
+  let txt=document.getElementById("txt").value;
+  let file=document.getElementById("img").files[0];
 
-  let img = null;
+  let img=null;
 
-  try{
-
-    if(file){
-      let r = ref(storage,"img/"+Date.now()+file.name);
-      await uploadBytes(r,file);
-      img = await getDownloadURL(r);
-    }
-
-  }catch(e){
-    alert("Image upload failed");
-    return;
+  if(file){
+    let r=ref(storage,"img/"+Date.now()+file.name);
+    await uploadBytes(r,file);
+    img=await getDownloadURL(r);
   }
 
   await addDoc(collection(db,"posts"),{
@@ -224,51 +177,28 @@ window.reply = async function(){
     content:txt,
     author:user(),
     image:img,
-    deleted:false
+    id:Date.now(),
+    reports:0
   });
 
-  document.getElementById("txt").value="";
-  document.getElementById("img").value="";
+  await updateDoc(doc(db,"threads",state.thread),{
+    bumpedAt:Date.now()
+  });
 };
 
-/* ===== RULES ===== */
-function rules(){
-  document.getElementById("app").innerHTML=`
-  <div class="post">
-  <h3>RULES</h3>
+/* ===== REPORT ===== */
+window.reportPost = async function(postId){
+  alert("reported: "+postId);
+};
 
-  Правила форума NEONVOID
+/* ===== LISTENER (FIXED CORE) ===== */
+function listen(id){
 
-  Основное правило:
-  Не создавай проблем другим пользователям.
+  if(unsub) unsub();
 
-  Свобода контента:
-  Разрешено всё, что не нарушает закон РФ.
+  const q=query(collection(db,"posts"),orderBy("id","asc"));
 
-  Анонимность:
-  Не раскрывай личности.
-
-  Модерация:
-  Решения окончательны.
-
-  Запрещено:
-  - насилие
-  - терроризм
-  - доксинг
-  - спам
-
-  Добро пожаловать на NEONVOID
-  </div>`;
-}
-
-/* ===== POSTS LISTENER (FIXED DUPLICATION) ===== */
-function listenPosts(id){
-
-  if(unsubPosts) unsubPosts();
-
-  const q = query(collection(db,"posts"));
-
-  unsubPosts = onSnapshot(q,(snap)=>{
+  unsub=onSnapshot(q,(snap)=>{
 
     let html="";
 
@@ -277,19 +207,23 @@ function listenPosts(id){
 
       if(p.threadId===id){
 
-        if(p.deleted){
-          html+=`
-          <div class="post deleted">
-            [deleted]
-          </div>`;
-        }else{
-          html+=`
-          <div class="post">
-            <b>${p.author}</b><br>
-            ${p.content||""}
-            ${p.image?`<img class="postimg" src="${p.image}">`:""}
-          </div>`;
-        }
+        let text=p.content||"";
+
+        /* >>reply parsing */
+        text = text.replace(/>>(\d+)/g,
+          `<span class="replyref">>>$1</span>`
+        );
+
+        html+=`
+        <div class="post">
+          <div class="small">${p.author} #${p.id}</div>
+
+          ${text}
+
+          ${p.image?`<img class="postimg" src="${p.image}">`:""}
+
+          <div class="report" onclick="reportPost('${d.id}')">report</div>
+        </div>`;
       }
     });
 
@@ -297,38 +231,6 @@ function listenPosts(id){
   });
 }
 
-/* ===== RENDER SAFE (NO MULTI LISTEN) ===== */
-function render(){
-
-  if(state.view==="rules") return rules();
-
-  if(unsubThreads) unsubThreads();
-
-  const q = query(collection(db,"threads"),orderBy("createdAt","desc"));
-
-  unsubThreads = onSnapshot(q,(snap)=>{
-
-    let html = `<h3>${state.board}</h3>`;
-
-    snap.forEach(d=>{
-      let t = d.data();
-
-      if(t.board === state.board){
-        html += `
-        <div class="post">
-          <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
-            <b>${t.title}</b>
-          </a><br>
-          ${t.content}
-        </div>`;
-      }
-    });
-
-    document.getElementById("app").innerHTML = html;
-  });
-}
-
-render();
 </script>
 
 </body>
