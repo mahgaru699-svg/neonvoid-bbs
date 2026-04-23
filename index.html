@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS SAFE</title>
+<title>NEONVOID v14 STABLE</title>
 
 <style>
 body{
@@ -32,6 +32,7 @@ body{
   background:#fff;
   padding:8px;
   margin:6px 0;
+  word-break: break-word;
 }
 
 textarea{
@@ -39,12 +40,25 @@ textarea{
   height:90px;
 }
 
-button{margin:4px 0;cursor:pointer;}
+button{
+  margin:5px 0;
+  cursor:pointer;
+}
 
 img.postimg{
   max-width:220px;
   display:block;
   margin-top:5px;
+}
+
+.replyref{
+  color:blue;
+  cursor:pointer;
+}
+
+.deleted{
+  opacity:0.5;
+  font-style:italic;
 }
 
 .footer{
@@ -62,17 +76,18 @@ img.postimg{
 </div>
 
 <div class="nav">
-  <a onclick="goForum()">Forum</a>
-  <a onclick="goRules()">Rules</a>
+  <a onclick="showForum()">Forum</a>
+  <a onclick="showRules()">Rules</a>
 </div>
 
 <button onclick="newThread()">New Thread</button>
 
 <div id="app"></div>
 
-<div class="footer">NEONVOID SAFE MODE</div>
+<div class="footer">NEONVOID v14 STABLE</div>
 
 <script type="module">
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import {
   getFirestore,
@@ -90,6 +105,7 @@ import {
   getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js";
 
+/* ===== FIREBASE ===== */
 const firebaseConfig = {
   apiKey: "AIzaSyAtTTArBPBNHmZZJSytqjaRwA3nXvANBV0",
   authDomain: "neonevvvoid.firebaseapp.com",
@@ -103,36 +119,55 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== SAFE STATE ===== */
-let currentThread = null;
-let unsub = null;
+/* ===== STATE (STABLE CORE) ===== */
+let state = {
+  view:"forum",
+  thread:null
+};
 
-/* ===== USER ===== */
+/* ===== GLOBAL CACHE (IMPORTANT FIX) ===== */
+let threadsCache = [];
+let postsCache = [];
+
+/* ===== USER ID ===== */
 function user(){
   let id = localStorage.getItem("id");
   if(!id){
-    id="anon"+Math.floor(Math.random()*9999);
+    id="anon-"+Math.floor(Math.random()*99999);
     localStorage.setItem("id",id);
   }
   return id;
 }
 
-/* ===== NAV SAFE ===== */
-window.goForum = function(){
+/* ===== INIT LISTENERS ONCE (CRITICAL FIX) ===== */
+const qThreads = query(collection(db,"threads"),orderBy("createdAt","desc"));
+onSnapshot(qThreads,(snap)=>{
+  threadsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+  if(state.view==="forum") renderForum();
+});
+
+const qPosts = query(collection(db,"posts"));
+onSnapshot(qPosts,(snap)=>{
+  postsCache = snap.docs.map(d=>({id:d.id,...d.data()}));
+});
+
+/* ===== NAV ===== */
+window.showForum = function(){
+  state.view="forum";
   renderForum();
 };
 
-window.goRules = function(){
+window.showRules = function(){
   document.getElementById("app").innerHTML=`
     <div class="post">
-      <h3>Rules</h3>
-      <p>Не создавай проблем другим пользователям.</p>
+      <h3>RULES</h3>
+      <p>Не мешай другим пользователям.</p>
       <p>Разрешено всё в рамках закона.</p>
       <p>Анонимность обязательна.</p>
     </div>`;
 };
 
-/* ===== THREAD ===== */
+/* ===== THREAD CREATE ===== */
 window.newThread = async function(){
 
   let t=prompt("Title:");
@@ -149,7 +184,8 @@ window.newThread = async function(){
 /* ===== OPEN THREAD ===== */
 window.openThread = function(id,t,c){
 
-  currentThread=id;
+  state.thread=id;
+  state.view="thread";
 
   document.getElementById("app").innerHTML=`
     <h3>${t}</h3>
@@ -157,15 +193,16 @@ window.openThread = function(id,t,c){
 
     <textarea id="txt"></textarea>
     <input type="file" id="img">
+
     <button onclick="reply()">Reply</button>
 
     <div id="posts"></div>
   `;
 
-  listenPosts(id);
+  renderPosts();
 };
 
-/* ===== REPLY SAFE ===== */
+/* ===== REPLY (FIXED IMAGE SAFE) ===== */
 window.reply = async function(){
 
   let txt=document.getElementById("txt").value;
@@ -180,69 +217,65 @@ window.reply = async function(){
   }
 
   await addDoc(collection(db,"posts"),{
-    threadId:currentThread,
+    threadId:state.thread,
     content:txt,
     author:user(),
-    image:img
+    image:img,
+    id:Date.now(),
+    deleted:false
   });
+
+  document.getElementById("txt").value="";
+  document.getElementById("img").value="";
 };
 
-/* ===== LISTENER SAFE ===== */
-function listenPosts(id){
-
-  if(unsub) unsub();
-
-  const q=query(collection(db,"posts"));
-
-  unsub = onSnapshot(q,(snap)=>{
-
-    let html="";
-
-    snap.forEach(d=>{
-      let p=d.data();
-
-      if(p.threadId===id){
-        html+=`
-        <div class="post">
-          <b>${p.author}</b><br>
-          ${p.content||""}
-          ${p.image?`<img class="postimg" src="${p.image}">`:""}
-        </div>`;
-      }
-    });
-
-    document.getElementById("posts").innerHTML=html;
-  });
-}
-
-/* ===== RENDER FORUM ===== */
+/* ===== SAFE RENDER FORUM ===== */
 function renderForum(){
 
-  const q=query(collection(db,"threads"),orderBy("createdAt","desc"));
+  let html="<h3>BOARD</h3>";
 
-  if(unsub) unsub();
+  for(let t of threadsCache){
 
-  unsub = onSnapshot(q,(snap)=>{
+    html+=`
+    <div class="post">
+      <a onclick="openThread('${t.id}','${t.title}','${t.content}')">
+        <b>${t.title}</b>
+      </a><br>
+      ${t.content}
+    </div>`;
+  }
 
-    let html="<h3>BOARD</h3>";
-
-    snap.forEach(d=>{
-      let t=d.data();
-
-      html+=`
-      <div class="post">
-        <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
-          <b>${t.title}</b>
-        </a><br>
-        ${t.content}
-      </div>`;
-    });
-
-    document.getElementById("app").innerHTML=html;
-  });
+  document.getElementById("app").innerHTML=html;
 }
 
-renderForum();
+/* ===== SAFE POSTS RENDER ===== */
+function renderPosts(){
+
+  let html="";
+
+  for(let p of postsCache){
+
+    if(p.threadId===state.thread){
+
+      let text=p.content||"";
+
+      /* >>reply highlight */
+      text = text.replace(/>>(\d+)/g,
+        `<span class="replyref">>>$1</span>`
+      );
+
+      html+=`
+      <div class="post ${p.deleted?'deleted':''}">
+        <b>${p.author}</b><br>
+        ${text}
+        ${p.image?`<img class="postimg" src="${p.image}">`:""}
+      </div>`;
+    }
+  }
+
+  document.getElementById("posts").innerHTML=html;
+}
+
 </script>
 
 </body>
