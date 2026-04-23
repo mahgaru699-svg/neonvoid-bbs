@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID.BBS v10</title>
+<title>NEONVOID.BBS v11</title>
 
 <style>
 body{
@@ -17,11 +17,14 @@ body{
   margin-bottom:10px;
 }
 
+/* FIXED LOGO (no wrapper, no crop) */
 .header img{
   max-width:420px;
   width:100%;
+  height:auto;
   display:block;
   margin:0 auto;
+  border:1px solid #ccc;
 }
 
 .nav a{
@@ -29,7 +32,6 @@ body{
   margin:0 6px;
   cursor:pointer;
   text-decoration: underline;
-  font-size:14px;
 }
 
 .post{
@@ -37,6 +39,7 @@ body{
   background:#f9f9f9;
   padding:8px;
   margin:8px 0;
+  word-break: break-word;
 }
 
 textarea{
@@ -50,29 +53,14 @@ button{
 }
 
 img.postimg{
-  max-width:200px;
+  max-width:220px;
   display:block;
   margin-top:5px;
-}
-
-.hidden{
-  display:none;
-}
-
-.replybox{
-  margin-top:10px;
 }
 
 .deleted{
   opacity:0.5;
   font-style:italic;
-}
-
-.rules{
-  white-space:pre-wrap;
-  background:#fff;
-  padding:10px;
-  border:1px solid #ccc;
 }
 
 .footer{
@@ -87,7 +75,10 @@ img.postimg{
 <body>
 
 <div class="header">
-  <img src="https://i.ibb.co/xtYZ6sjK/Chat-GPT-Image-22-2026-04-20-35.png">
+
+  <!-- 🖼️ FIXED LOGO (REAL IMAGE URL ONLY) -->
+  <img src="https://i.ibb.co/Q3XDDHYB/Chat-GPT-Image-22-2026-04-20-35-1.png" alt="logo">
+
 </div>
 
 <div class="nav">
@@ -139,14 +130,15 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
-/* ===== STATE ===== */
+/* ===== STATE SAFE ===== */
 let state = {
   view:"forum",
   board:"frontline",
   thread:null
 };
 
-let unsub = null;
+let unsubPosts = null;
+let unsubThreads = null;
 
 /* ===== USER ===== */
 function user(){
@@ -170,7 +162,7 @@ window.board = function(b){
   render();
 };
 
-/* ===== THREAD ===== */
+/* ===== THREAD CREATE (SAFE) ===== */
 window.newThread = async function(){
 
   let t = prompt("Title:");
@@ -181,8 +173,7 @@ window.newThread = async function(){
     title:t,
     content:c,
     board:state.board,
-    createdAt:Date.now(),
-    deleted:false
+    createdAt:Date.now()
   });
 };
 
@@ -204,10 +195,10 @@ window.openThread = function(id,t,c){
     <div id="posts"></div>
   `;
 
-  listen(id);
+  listenPosts(id);
 };
 
-/* ===== REPLY (FIXED IMAGE BUG) ===== */
+/* ===== REPLY (FIXED IMAGE BUG FINAL) ===== */
 window.reply = async function(){
 
   let txt = document.getElementById("txt").value;
@@ -215,17 +206,24 @@ window.reply = async function(){
 
   let img = null;
 
-  if(file){
-    let r = ref(storage,"img/"+Date.now()+file.name);
-    await uploadBytes(r,file);
-    img = await getDownloadURL(r);
+  try{
+
+    if(file){
+      let r = ref(storage,"img/"+Date.now()+file.name);
+      await uploadBytes(r,file);
+      img = await getDownloadURL(r);
+    }
+
+  }catch(e){
+    alert("Image upload failed");
+    return;
   }
 
   await addDoc(collection(db,"posts"),{
     threadId:state.thread,
     content:txt,
-    image:img,
     author:user(),
+    image:img,
     deleted:false
   });
 
@@ -233,58 +231,44 @@ window.reply = async function(){
   document.getElementById("img").value="";
 };
 
-/* ===== DELETE POST (SOFT) ===== */
-window.delPost = async function(idRef){
-
-  await updateDoc(doc(db,"posts",idRef),{
-    deleted:true
-  });
-};
-
-/* ===== RESTORE POST ===== */
-window.restorePost = async function(idRef){
-
-  await updateDoc(doc(db,"posts",idRef),{
-    deleted:false
-  });
-};
-
-/* ===== RULES (FULL INSERTED) ===== */
+/* ===== RULES ===== */
 function rules(){
   document.getElementById("app").innerHTML=`
-  <div class="rules">
-Правила форума NEONVOID
+  <div class="post">
+  <h3>RULES</h3>
 
-Основное правило
-Не создавай проблем другим пользователям. Если твой пост, тред или поведение мешает нормальному обсуждению или провоцирует бессмысленные конфликты — он может быть удалён, а ты — получить предупреждение или бан.
+  Правила форума NEONVOID
 
-Свобода контента
-На форуме разрешено практически всё, что не нарушает законодательство Российской Федерации. Политические, спорные и провокационные темы допускаются.
+  Основное правило:
+  Не создавай проблем другим пользователям.
 
-Анонимность
-Уважай анонимность других пользователей. Не пытайся выяснять реальную личность анона, не требуй личных данных и не устраивай допросы.
+  Свобода контента:
+  Разрешено всё, что не нарушает закон РФ.
 
-Отношение к модерации
-Решения модераторов окончательны.
+  Анонимность:
+  Не раскрывай личности.
 
-Запрещено:
-- насилие
-- терроризм
-- доксинг
-- спам
+  Модерация:
+  Решения окончательны.
 
-Добро пожаловать на NEONVOID
+  Запрещено:
+  - насилие
+  - терроризм
+  - доксинг
+  - спам
+
+  Добро пожаловать на NEONVOID
   </div>`;
 }
 
-/* ===== LISTENER FIX ===== */
-function listen(id){
+/* ===== POSTS LISTENER (FIXED DUPLICATION) ===== */
+function listenPosts(id){
 
-  if(unsub) unsub();
+  if(unsubPosts) unsubPosts();
 
   const q = query(collection(db,"posts"));
 
-  unsub = onSnapshot(q,(snap)=>{
+  unsubPosts = onSnapshot(q,(snap)=>{
 
     let html="";
 
@@ -297,7 +281,6 @@ function listen(id){
           html+=`
           <div class="post deleted">
             [deleted]
-            <button onclick="restorePost('${d.id}')">restore</button>
           </div>`;
         }else{
           html+=`
@@ -305,9 +288,6 @@ function listen(id){
             <b>${p.author}</b><br>
             ${p.content||""}
             ${p.image?`<img class="postimg" src="${p.image}">`:""}
-
-            <br>
-            <button onclick="delPost('${d.id}')">delete</button>
           </div>`;
         }
       }
@@ -317,22 +297,24 @@ function listen(id){
   });
 }
 
-/* ===== RENDER SAFE ===== */
+/* ===== RENDER SAFE (NO MULTI LISTEN) ===== */
 function render(){
 
   if(state.view==="rules") return rules();
 
+  if(unsubThreads) unsubThreads();
+
   const q = query(collection(db,"threads"),orderBy("createdAt","desc"));
 
-  onSnapshot(q,(snap)=>{
+  unsubThreads = onSnapshot(q,(snap)=>{
 
-    let html=`<h3>${state.board}</h3>`;
+    let html = `<h3>${state.board}</h3>`;
 
     snap.forEach(d=>{
-      let t=d.data();
+      let t = d.data();
 
-      if(t.board===state.board){
-        html+=`
+      if(t.board === state.board){
+        html += `
         <div class="post">
           <a onclick="openThread('${d.id}','${t.title}','${t.content}')">
             <b>${t.title}</b>
@@ -342,7 +324,7 @@ function render(){
       }
     });
 
-    document.getElementById("app").innerHTML=html;
+    document.getElementById("app").innerHTML = html;
   });
 }
 
