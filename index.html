@@ -2,13 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<title>NEONVOID v16</title>
+<title>NEONVOID v17</title>
 
 <style>
 body{
   font-family: Arial;
   background:#eef2ff;
   margin:20px;
+  color:#000;
 }
 
 .header{
@@ -73,6 +74,7 @@ img.postimg{
   text-align:center;
   margin-top:60px;
   opacity:0.6;
+  font-size:12px;
 }
 </style>
 </head>
@@ -93,7 +95,9 @@ img.postimg{
 
 <div id="app"></div>
 
-<div class="footer">NEONVOID v16 ADMIN</div>
+<div class="footer">
+Created in 2026 — For you with soul
+</div>
 
 <script type="module">
 
@@ -143,9 +147,13 @@ function user(){
   return id;
 }
 
-/* ===== ADMIN KEY ===== */
+/* ===== ROLE SYSTEM ===== */
+function decodeKey(){
+  return atob("TlYtUk9PVC0yMDI2"); // NV-ROOT-2026
+}
+
 function isAdmin(){
-  return localStorage.getItem("admin") === "1";
+  return localStorage.getItem("role") === "admin";
 }
 
 /* ===== LISTEN POSTS ===== */
@@ -177,7 +185,7 @@ window.showRules = function(){
   `;
 };
 
-/* ===== THREAD ===== */
+/* ===== THREADS ===== */
 window.newThread = async function(){
 
   let t=prompt("Title:");
@@ -230,12 +238,11 @@ window.reply = async function(){
     content:txt,
     author:user(),
     image:img,
-    id:Date.now(),
-    deleted:false
+    id:Date.now()
   });
 };
 
-/* ===== REPORT POST ===== */
+/* ===== REPORT ===== */
 window.reportPost = async function(postId){
 
   await addDoc(collection(db,"reports"),{
@@ -246,28 +253,36 @@ window.reportPost = async function(postId){
   alert("Reported");
 };
 
-/* ===== ADMIN PANEL ===== */
+/* ===== ADMIN ===== */
 window.openAdmin = function(){
 
-  if(!isAdmin()){
-    let key = prompt("Admin key:");
-    if(key==="1234"){
-      localStorage.setItem("admin","1");
-      alert("Admin enabled");
-    } else {
-      alert("wrong key");
-      return;
-    }
+  let key = prompt("Admin key:");
+
+  if(key === decodeKey()){
+    localStorage.setItem("role","admin");
   }
 
-  let html = `<div class="adminPanel"><h3>ADMIN PANEL</h3>`;
+  if(!isAdmin()){
+    alert("ACCESS DENIED");
+    return;
+  }
+
+  renderAdmin();
+};
+
+/* ===== ADMIN PANEL ===== */
+function renderAdmin(){
+
+  let html = `<div class="adminPanel"><h3>ADMIN PANEL v17</h3>`;
+
+  html += `<p>Role: ADMIN</p>`;
 
   html += `<h4>Reports</h4>`;
 
   for(let r of reportsCache){
     html += `
       <div class="post">
-        PostID: ${r.postId}
+        Report → PostID: ${r.postId}
       </div>
     `;
   }
@@ -275,9 +290,9 @@ window.openAdmin = function(){
   html += `</div>`;
 
   document.getElementById("app").innerHTML = html;
-};
+}
 
-/* ===== POSTS RENDER ===== */
+/* ===== POSTS ===== */
 function renderPosts(){
 
   let html="";
